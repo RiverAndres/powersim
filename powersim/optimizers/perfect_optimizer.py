@@ -261,7 +261,7 @@ class PerfectOptimizer(BaseOptimizer):
 
         solver = pyo.SolverFactory(self.solver_name)
         solver.options["mip_rel_gap"] = self.precision / 100
-        # solver.options["threads"] = 12
+        solver.options["threads"] = 12
         results = solver.solve(self.model, tee = True)
 
         if (
