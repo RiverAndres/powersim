@@ -18,7 +18,7 @@ class PerfectOptimizer(BaseOptimizer):
 
         self.system = system
         self.markets = markets
-        self.prices = markets[0].datasets["p_pmd"]
+        self.timestamps = next(iter(markets[0].datasets.values()))
         self.solver_name = solver_name
         self.precision = precision
 
@@ -27,7 +27,7 @@ class PerfectOptimizer(BaseOptimizer):
 
     def _model_setup(self) -> pyo.ConcreteModel:
         
-        time_index = self.prices.index.tolist()
+        time_index = self.timestamps.index.tolist()
         time_duration = calculate_time_deltas(time_index)
 
         day_index = sorted({t.date() for t in time_index})
@@ -261,7 +261,7 @@ class PerfectOptimizer(BaseOptimizer):
 
         solver = pyo.SolverFactory(self.solver_name)
         solver.options["mip_rel_gap"] = self.precision / 100
-        solver.options["threads"] = 12
+        solver.options["threads"] = 16
         results = solver.solve(self.model, tee = True)
 
         if (

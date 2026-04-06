@@ -826,7 +826,7 @@ class AFRR(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"Band_up_{self.name}")[t]
-                    <= m.system_capacity_export
+                    <= m.system_capacity_export # Crear una expresion que calcule la banda disponible a subir
                 )
             )
         )
@@ -837,7 +837,7 @@ class AFRR(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"Band_down_{self.name}")[t]
-                    <= m.system_capacity_import
+                    <= m.system_capacity_import # Crear una expresion que calcule la banda disponible a bajar
                 )
             )
         )
@@ -948,17 +948,29 @@ class AFRR(Market):
         self.act
 
         index = self.datasets["e_afrr_act_up"].index
-        self.datasets["perc_afft_act_up"] = pd.DataFrame(
-            data = self.datasets["e_afrr_act_up"]["value"] / self.datasets["band_afrr_up"]["value"],
+        _perc_affr_act_up = pd.DataFrame(
+            # data = self.datasets["e_afrr_act_up"]["value"] / self.datasets["band_afrr_up"]["value"],
             index = index
         )
-        self.datasets["perc_afft_act_up"] = pd.DataFrame(
-            data = self.datasets["e_afrr_act_down"]["value"] / self.datasets["band_afrr_down"]["value"],
+        _perc_affr_act_down = pd.DataFrame(
+            # data = self.datasets["e_afrr_act_down"]["value"] / self.datasets["band_afrr_down"]["value"],
             index = index
         )
 
-        e_afrr_act_up = self.datasets["perc_afft_act_up"]
-        e_afrr_act_down = self.datasets["perc_afft_act_up"]
+        match self.act:
+            case None:
+                _perc_affr_act_up["value"] = 0
+                _perc_affr_act_down["value"] = 0
+            case "bin_prop":
+                _perc_affr_act_up["value"] = self.datasets["e_afrr_act_up"]["value"] / self.datasets["band_afrr_up"]["value"]
+                _perc_affr_act_down["value"] = self.datasets["e_afrr_act_down"]["value"] / self.datasets["band_afrr_down"]["value"]
+            case "bin_max":
+                pass
+            case "rand":
+                pass
+
+        e_afrr_act_up = _perc_affr_act_up
+        e_afrr_act_down = _perc_affr_act_down
 
         return e_afrr_act_up, e_afrr_act_down
     
