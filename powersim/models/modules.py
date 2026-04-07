@@ -2,7 +2,7 @@ import pvlib
 import pandas as pd
 import pyomo.environ as pyo
 from typing import Literal
-from calendar import isleap
+from calendar import isleap, monthrange
 
 from ..utils.cache import df_cache
 
@@ -381,7 +381,8 @@ class Battery():
             soc_max:float = 1,
             soc_initial:float = 0,
             max_cycles_day:float | None = None,
-            max_cycles_day_avg:float | None = None,
+            max_cycles_day_monthly_avg:float | None = None,
+            max_cycles_day_yearly_avg:float | None = None,
             rsoc: tuple[int | None, int | None, Literal["monthly", "yearly"] | None] | None = None,
             resting_period: int | None = None,
             min_power_output: float | None = 0.1,
@@ -394,7 +395,8 @@ class Battery():
         self.soc_max = soc_max
         self.soc_initial = soc_initial
         self.max_cycles_day = max_cycles_day
-        self.max_cycles_day_avg = max_cycles_day_avg
+        self.max_cycles_day_monthly_avg = max_cycles_day_monthly_avg
+        self.max_cycles_day_yearly_avg = max_cycles_day_yearly_avg
         self.max_power_output = capacity * c_rate
         self.min_power_output = min_power_output
         self.rsoc = rsoc
@@ -557,7 +559,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
                 )
             )
 
-        if self.max_cycles_day_avg:
+        if self.max_cycles_day_yearly_avg:
             def max_cycles_year(m, y):
                 if isleap(year = y):
                     days_of_the_year = 366
@@ -567,11 +569,24 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
                 return sum(
                     m.cycles[b, t] for t in T if m.year_of_t[t] == y
                 ) <= self.max_cycles_day_avg * days_of_the_year
-
+        
             model.add_component(
                 f"max_cycles_day_yearly_avg{b}",
                 pyo.Constraint(
                     year, rule = max_cycles_year
+                )
+            )
+
+        if self.max_cycles_day_monthly_avg:
+            def max_cycles_month(m, month):
+                return sum(
+                    m.cycles[b, t] for t in T if m.month_of_t[t] == month
+                ) <= self.max_cycles_day_monthly_avg * monthrange(month//100, month%100)[1]
+
+            model.add_component(
+                f"max_cycles_day_monthly_avg{b}",
+                pyo.Constraint(
+                    month, rule = max_cycles_month
                 )
             )
 
@@ -706,7 +721,6 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
             .set_index("time")
             .sort_index()
         )
-        df.iloc
 
         # Energías útiles
         df["E_charge"] = df["P_charge"] * df["dt"]

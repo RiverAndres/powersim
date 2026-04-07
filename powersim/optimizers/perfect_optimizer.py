@@ -260,10 +260,26 @@ class PerfectOptimizer(BaseOptimizer):
     def _solve(self):
 
         solver = pyo.SolverFactory(self.solver_name)
-        solver.options["mip_rel_gap"] = self.precision / 100
-        solver.options["threads"] = 16
-        results = solver.solve(self.model, tee = True)
+        # solver.options["mip_rel_gap"] = self.precision / 100
+        # solver.options["solver"] = "aa"
+        # solver.options["parallel"] = "on"
+        # solver.options["threads"] = 12
+        # solver.options["log_to_console"] = "true"
+        # solver.options["output_flag"] = "true"
 
+        options = {
+            "mip_rel_gap": self.precision / 100,
+            "mip_lp_solver": "hipo",
+            "parallel": "on",
+            "threads": 12,
+            "write_solution_style": 2,
+        }
+
+        results = solver.solve(
+            self.model,
+            tee = True,
+            options = options)
+        
         if (
             results.solver.status != SolverStatus.ok
             or results.solver.termination_condition
@@ -284,5 +300,6 @@ class PerfectOptimizer(BaseOptimizer):
         self._model_setup()
         self._objective_maximize_revenues()
         self._solve()
+        
 
         return self
