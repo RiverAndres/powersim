@@ -405,29 +405,25 @@ class Battery():
     
     def __str__(self):
         return f"""\
-Battery; Name {self.name} ; Capacity {self.capacity:.2f} MW ; RTE {self.rte:.2f} ; C_rate {self.c_rate:.2f} 1/h ; DOD {self.dod:.2f} ; SOC_max {self.soc_max:.2f} ; SOC_initial {self.soc_initial:.2f} ; Max cycles per day {self.max_cycles_day} cycles ; Max cycles per day on average {self.max_cycles_day_avg} cycles ; RSOC {self.rsoc} ; Resting period {self.resting_period} h\
+Battery; Name {self.name} ; Capacity {self.capacity:.2f} MW ; RTE {self.rte:.2f} ; C_rate {self.c_rate:.2f} 1/h ; DOD {self.dod:.2f} ; SOC_max {self.soc_max:.2f} ; SOC_initial {self.soc_initial:.2f} ; Max cycles per day {self.max_cycles_day} cycles ; Max cycles per day monthly average {self.max_cycles_day_monthly_avg} ; Max cycles per day yearly average {self.max_cycles_day_yearly_avg} cycles ; RSOC {self.rsoc} ; Resting period {self.resting_period} h\
 """
     
     def __repr__(self):
         return f"""\
-Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self.c_rate}, dod={self.dod}, soc_max={self.soc_max}, soc_initial={self.soc_initial}, max_cycles_day={self.max_cycles_day}, max_cycles_day_avg={self.max_cycles_day_avg}, max_power_output={self.max_power_output}, min_power_output={self.min_power_output}, rsoc={self.rsoc}, resting_period={self.resting_period})\
+Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self.c_rate}, dod={self.dod}, soc_max={self.soc_max}, soc_initial={self.soc_initial}, max_cycles_day={self.max_cycles_day}, max_cycles_day_monthly_avg={self.max_cycles_day_monthly_avg}, max_cycles_day_yearly_avg={self.max_cycles_day_yearly_avg}, max_power_output={self.max_power_output}, min_power_output={self.min_power_output}, rsoc={self.rsoc}, resting_period={self.resting_period})\
 """
-    def _base_lp_constraints(self, model: pyo.ConcreteModel):
+    def _base_lp_components(self, model: pyo.ConcreteModel):
         b = self.name
-        T = model.T # SET of timestamps
-        day = model.D # SET of days
-        month = model.M # set of months
-        year = model.Y # set of years
 
         def soc_balance(m, t):
-            if t == T.first():
+            if t == model.T.first():
                 return (
                     m.SOC[b, t]
                     == self.soc_initial
                     + self.rte**(1/2) * m.P_charge[b, t] * m.dt[t] / self.capacity
                     - (1/self.rte**(1/2)) * m.P_discharge[b, t] * m.dt[t] / self.capacity
                 )
-            t_prev = T.prev(t)
+            t_prev = model.T.prev(t)
 
             return (
                 m.SOC[b, t]
@@ -438,33 +434,32 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         
         model.add_component(
             f"soc_balance_{b}",
-            pyo.Constraint(T, rule = soc_balance),
+            pyo.Constraint(model.T, rule = soc_balance),
         )
 
         model.add_component(
             f"soc_limit_{b}",
             pyo.Constraint(
-                T, rule  = lambda m, t: m.SOC[b, t] <= self.soc_max
+                model.T, rule  = lambda m, t: m.SOC[b, t] <= self.soc_max
             ),
         )
 
         model.add_component(
             f"charge_limit_{b}",
             pyo.Constraint(
-                T, rule = lambda m, t: m.P_charge[b, t] <= self.max_power_output
+                model.T, rule = lambda m, t: m.P_charge[b, t] <= self.max_power_output
             ),
         )
 
         model.add_component(
             f"discharge_limit_{b}",
             pyo.Constraint(
-                T, rule = lambda m, t: m.P_discharge[b, t] <= self.max_power_output
+                model.T, rule = lambda m, t: m.P_discharge[b, t] <= self.max_power_output
             ),
         )
 
-    def _additional_milp_constraints(self, model: pyo.ConcreteModel):
+    def _additional_milp_components(self, model: pyo.ConcreteModel):
         b = self.name
-        T = model.T # SET of timestamps
         day = model.D # SET of days
         month = model.M # set of months
         year = model.Y # set of years
@@ -475,7 +470,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         model.add_component(
             f"mode_of_operation_check_{b}",
             pyo.Constraint(
-                T, rule = mode_of_operation_check
+                model.T, rule = mode_of_operation_check
             )
         )
 
@@ -485,7 +480,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         model.add_component(
             f"discharge_mode_{b}",
             pyo.Constraint(
-                T, rule = discharge_mode
+                model.T, rule = discharge_mode
             )
         )
 
@@ -495,7 +490,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         model.add_component(
             f"charge_mode_{b}",
             pyo.Constraint(
-                T, rule = charge_mode
+                model.T, rule = charge_mode
             )
         )
 
@@ -505,7 +500,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         model.add_component(
             f"min_charge_allowed_{b}",
             pyo.Constraint(
-                T, rule = min_charge_allowed
+                model.T, rule = min_charge_allowed
             )
         )
 
@@ -515,41 +510,41 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         model.add_component(
             f"min_discharge_allowed_{b}",
             pyo.Constraint(
-                T, rule = min_discharge_allowed
+                model.T, rule = min_discharge_allowed
             )
         )
 
     # limitacion de ciclado anual promedio y ciclo diario máximo
-        if self.max_cycles_day or self.max_cycles_day_avg:
+        if self.max_cycles_day or self.max_cycles_day_monthly_avg or self.max_cycles_day_yearly_avg:
             def charge_cycles_rule(m, t):
-                if t == T.first():
+                if t == model.T.first():
                     return m.cycles[b, t] == 0
-                t_prev = T.prev(t)
+                t_prev = model.T.prev(t)
                 return m.cycles[b, t] >= (m.SOC[b, t] - m.SOC[b, t_prev]) / 2
             
             def discharge_cycles_rule(m, t):
-                if t == T.first():
+                if t == model.T.first():
                     return pyo.Constraint.Skip
-                t_prev = T.prev(t)
+                t_prev = model.T.prev(t)
                 return m.cycles[b, t] >= (m.SOC[b, t_prev] - m.SOC[b, t]) / 2 
 
             model.add_component(
                 f"cycles_charge_{b}",
                 pyo.Constraint(
-                    T, rule = charge_cycles_rule
+                    model.T, rule = charge_cycles_rule
                 )
             )
             model.add_component(
                 f"cycles_discharge{b}",
                 pyo.Constraint(
-                    T, rule = discharge_cycles_rule
+                    model.T, rule = discharge_cycles_rule
                 )
             )
 
         if self.max_cycles_day:
             def max_cycles_day(m, d):
                 return sum(
-                    m.cycles[b, t] for t in T if m.day_of_t[t] == d
+                    m.cycles[b, t] for t in model.T if m.day_of_t[t] == d
                 ) <= self.max_cycles_day
             
             model.add_component(
@@ -567,8 +562,8 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
                     days_of_the_year = 365
 
                 return sum(
-                    m.cycles[b, t] for t in T if m.year_of_t[t] == y
-                ) <= self.max_cycles_day_avg * days_of_the_year
+                    m.cycles[b, t] for t in model.T if m.year_of_t[t] == y
+                ) <= self.max_cycles_day_yearly_avg * days_of_the_year
         
             model.add_component(
                 f"max_cycles_day_yearly_avg{b}",
@@ -580,7 +575,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         if self.max_cycles_day_monthly_avg:
             def max_cycles_month(m, month):
                 return sum(
-                    m.cycles[b, t] for t in T if m.month_of_t[t] == month
+                    m.cycles[b, t] for t in model.T if m.month_of_t[t] == month
                 ) <= self.max_cycles_day_monthly_avg * monthrange(month//100, month%100)[1]
 
             model.add_component(
@@ -598,7 +593,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
             model.add_component(
                 f"rsoc_upper_absolute_bound_{b}",
                 pyo.Constraint(
-                    T, rule = lambda m, t: m.RSOC[b, t]
+                    model.T, rule = lambda m, t: m.RSOC[b, t]
                     <= self.soc_max * m.rest[b, t]
                 )
             )
@@ -606,7 +601,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
             model.add_component(
                 f"rsoc_upper_relative_bound_{b}",
                 pyo.Constraint(
-                    T, rule = lambda m, t: m.RSOC[b, t]
+                    model.T, rule = lambda m, t: m.RSOC[b, t]
                     <= m.SOC[b, t]
                 )
             )
@@ -614,7 +609,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
             model.add_component(
                 f"rsoc_lower_relative_bound_{b}",
                 pyo.Constraint(
-                    T, rule = lambda m, t: m.RSOC[b, t]
+                    model.T, rule = lambda m, t: m.RSOC[b, t]
                     >= m.SOC[b, t] - self.soc_max * (1- m.rest[b, t])
                 )
             )
@@ -625,20 +620,20 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
                 def rsoc_min_calculation(m, period):
                     return (
                         sum(
-                            m.RSOC[b, t] * m.dt[t] for t in T if m.year_of_t[t] == period
+                            m.RSOC[b, t] * m.dt[t] for t in model.T if m.year_of_t[t] == period
                         ) 
                         >=
                         rsoc_min * sum(
-                            m.dt[t] * m.rest[b, t] for t in T if m.year_of_t[t] == period
+                            m.dt[t] * m.rest[b, t] for t in model.T if m.year_of_t[t] == period
                         )
                     )
 
                 def rsoc_max_calculation(m, period):
                     return (
                         sum(
-                            m.RSOC[b, t] * m.dt[t] for t in T if m.year_of_t[t] == period
+                            m.RSOC[b, t] * m.dt[t] for t in model.T if m.year_of_t[t] == period
                         ) <= rsoc_max * sum(
-                            m.dt[t] * m.rest[b, t] for t in T if m.year_of_t[t] == period
+                            m.dt[t] * m.rest[b, t] for t in model.T if m.year_of_t[t] == period
                         )
                     )
 
@@ -665,16 +660,16 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
                         ) 
                         >=
                         rsoc_min * sum(
-                            m.dt[t] * m.rest[b, t] for t in T if m.month_of_t[t] == period
+                            m.dt[t] * m.rest[b, t] for t in model.T if m.month_of_t[t] == period
                         )
                     )
 
                 def rsoc_max_calculation(m, period):
                     return (
                         sum(
-                            m.RSOC[b, t] * m.dt[t] for t in T if m.month_of_t[t] == period
+                            m.RSOC[b, t] * m.dt[t] for t in model.T if m.month_of_t[t] == period
                         ) <= rsoc_max * sum(
-                            m.dt[t] * m.rest[b, t] for t in T if m.month_of_t[t] == period
+                            m.dt[t] * m.rest[b, t] for t in model.T if m.month_of_t[t] == period
                         )
                     )
 
@@ -692,10 +687,109 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
                     )
                 )
 
-    def constraints(self, model: pyo.ConcreteModel):
-        self._base_lp_constraints(model = model)
-        if bool(self.max_cycles_day) or bool(self.max_cycles_day_avg) or bool(self.rsoc) or bool(self.resting_period):
-            self._additional_milp_constraints(model = model)
+    # Seccion especifica para forzar tiempo de reposo
+
+        if self.resting_period:
+            model.add_component(
+                f"Switch_{self.name}",
+                pyo.Var(model.T, domain = pyo.Binary)
+            )
+
+            def switch_on_at_rest_state(m, t): # switch on when changing from charge/discharge to rest
+                if t == model.T.first():
+                    return pyo.Constraint.Skip
+                
+                t_prev = m.T.prev(t)
+                return (
+                    getattr(model, f"Switch_{self.name}")[t]
+                    >=
+                    m.charge[b, t_prev] +
+                    m.discharge[b, t_prev] -
+                    m.charge[b, t] -
+                    m.discharge[b, t]
+                )
+            
+            model.add_component(
+                f"switch_on_at_rest_state_{b}",
+                pyo.Constraint(
+                    model.T, rule = switch_on_at_rest_state
+                )
+            )
+            
+            def switch_at_charge_change(m, t): # switch on when changing from charge to discharge
+                if t == model.T.first():
+                    return pyo.Constraint.Skip
+                
+                t_prev = m.T.prev(t)
+                return (
+                    getattr(model, f"Switch_{self.name}")[t]
+                    >=
+                    m.charge[b, t_prev] +
+                    m.discharge[b, t] -
+                    1
+                )
+                
+            model.add_component(
+                f"switch_at_charge_change_{b}",
+                pyo.Constraint(
+                    model.T, rule = switch_at_charge_change
+                )
+            )
+
+            def switch_at_discharge_change(m, t): # switch on when changing from charge to discharge
+                if t == model.T.first():
+                    return pyo.Constraint.Skip
+                
+                t_prev = m.T.prev(t)
+                return (
+                    getattr(model, f"Switch_{self.name}")[t]
+                    >=
+                    m.discharge[b, t_prev] +
+                    m.charge[b, t] -
+                    1
+                )
+
+            model.add_component(
+                f"switch_at_discharge_change_{b}",
+                pyo.Constraint(
+                    model.T, rule = switch_at_discharge_change
+                )
+            )
+
+            def min_resting_period(m, t):
+                total_elapsed_time = 0
+                current_rest_time = 0
+
+                for tp in m.T.atleast(t):
+                    total_elapsed_time += m.dt[tp]
+                    current_rest_time += m.rest[b, tp] * m.dt[tp]
+
+                    if total_elapsed_time >= self.resting_period:
+                        break
+
+                    return current_rest_time >= self.resting_period * getattr(model, f"Switch_{self.name}")[t]
+
+                
+            model.add_component(
+                f"min_resting_period_{b}",
+                pyo.Constraint(
+                    model.T, rule = min_resting_period
+                )
+            )
+
+    def components(self, model: pyo.ConcreteModel):
+        components = [
+            self.max_cycles_day,
+            self.max_cycles_day_monthly_avg,
+            self.max_cycles_day_yearly_avg,
+            self.rsoc,
+            self.resting_period,
+        ]
+        additional_components = sum([bool(component) for component in components])  
+
+        self._base_lp_components(model = model)
+        if additional_components:
+            self._additional_milp_components(model = model)
 
     def results(self, model: pyo.ConcreteModel):
         records = []

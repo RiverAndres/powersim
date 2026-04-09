@@ -1,10 +1,10 @@
 import pyomo.environ as pyo
 from pyomo.opt import SolverStatus, TerminationCondition
-from .base_optimizer import BaseOptimizer
-from ..visualization.results import SimulationResult
-from ..models.modules import System, Battery, Photovoltaic
-from ..markets.base import Market
-from ..utils.helpers import calculate_time_deltas
+from ..base_optimizer import BaseOptimizer
+from ...visualization.results import SimulationResult
+from ...models.modules import System, Battery, Photovoltaic
+from ...markets.base import Market
+from ...utils.helpers import calculate_time_deltas
 import pandas as pd
 import numpy as np
 
@@ -191,7 +191,7 @@ class PerfectOptimizer(BaseOptimizer):
         )
 
         for battery in self.system.batteries:
-            battery.constraints(self.model)
+            battery.components(self.model)
 
         for market in self.markets:
             market.components(self.model)
@@ -269,10 +269,9 @@ class PerfectOptimizer(BaseOptimizer):
 
         options = {
             "mip_rel_gap": self.precision / 100,
-            "mip_lp_solver": "hipo",
+            "mip_lp_solver": "ipx",
             "parallel": "on",
             "threads": 12,
-            "write_solution_style": 2,
         }
 
         results = solver.solve(
