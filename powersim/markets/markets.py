@@ -96,7 +96,7 @@ class DayAhead(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export * getattr(model, f"bin_{self.name}")[t]
+                    <= m.system_capacity_export# * getattr(model, f"bin_{self.name}")[t]
                 )
             )
         )
@@ -107,7 +107,7 @@ class DayAhead(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import * (1 - getattr(model, f"bin_{self.name}")[t])
+                    <= m.system_capacity_import# * (1 - getattr(model, f"bin_{self.name}")[t])
                 )
             )
         )
@@ -250,7 +250,7 @@ class IntraDay01(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export * getattr(model, f"bin_{self.name}")[t]
+                    <= m.system_capacity_export# * getattr(model, f"bin_{self.name}")[t]
                 )
             )
         )
@@ -261,7 +261,7 @@ class IntraDay01(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import * (1 - getattr(model, f"bin_{self.name}")[t])
+                    <= m.system_capacity_import# * (1 - getattr(model, f"bin_{self.name}")[t])
                 )
             )
         )
