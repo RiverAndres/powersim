@@ -497,24 +497,24 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         def min_charge_allowed(m, t):
             return m.P_charge[b, t] >= self.min_power_output * m.charge[b, t]
         
-        model.add_component(
-            f"min_charge_allowed_{b}",
-            pyo.Constraint(
-                model.T, rule = min_charge_allowed
-            )
-        )
+        # model.add_component(
+        #     f"min_charge_allowed_{b}",
+        #     pyo.Constraint(
+        #         model.T, rule = min_charge_allowed
+        #     )
+        # )
 
         def min_discharge_allowed(m, t):
             return m.P_discharge[b, t] >= self.min_power_output * m.discharge[b, t]
         
-        model.add_component(
-            f"min_discharge_allowed_{b}",
-            pyo.Constraint(
-                model.T, rule = min_discharge_allowed
-            )
-        )
+        # model.add_component(
+        #     f"min_discharge_allowed_{b}",
+        #     pyo.Constraint(
+        #         model.T, rule = min_discharge_allowed
+        #     )
+        # )
 
-    # limitacion de ciclado anual promedio y ciclo diario máximo
+    # limitacion de ciclado anual/mensual promedio y ciclo diario máximo
         if self.max_cycles_day or self.max_cycles_day_monthly_avg or self.max_cycles_day_yearly_avg:
             def charge_cycles_rule(m, t):
                 if t == model.T.first():

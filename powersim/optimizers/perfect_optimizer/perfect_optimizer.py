@@ -94,7 +94,7 @@ class PerfectOptimizer(BaseOptimizer):
                 # NONE
 
             ## SYSTEM VARIABLES
-        self.model.bin_system = pyo.Var(self.model.T, domain = pyo.Binary)
+        # self.model.bin_system = pyo.Var(self.model.T, domain = pyo.Binary)
         self.model.P_import = pyo.Var(self.model.T, domain = pyo.NonNegativeReals)
         self.model.P_export = pyo.Var(self.model.T, domain = pyo.NonNegativeReals)
         self.model.P_excess = pyo.Var(self.model.T, domain = pyo.NonNegativeReals)
@@ -159,14 +159,14 @@ class PerfectOptimizer(BaseOptimizer):
         self.model.export_mode_limit = pyo.Constraint(
             self.model.T,
             rule = lambda m, t: (m.P_export[t]
-                <= m.system_capacity_export * m.bin_system[t]
+                <= m.system_capacity_export# * m.bin_system[t]
             )
         )
 
         self.model.import_mode_limit = pyo.Constraint(
             self.model.T,
             rule = lambda m, t: (m.P_import[t]
-                <= m.system_capacity_import * (1 - m.bin_system[t])
+                <= m.system_capacity_import# * (1 - m.bin_system[t])
             )
         )
 

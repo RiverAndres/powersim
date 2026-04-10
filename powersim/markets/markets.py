@@ -63,10 +63,10 @@ class DayAhead(Market):
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
         )       
         # Variables
-        model.add_component(
-            f"bin_{self.name}",
-            pyo.Var(model.T, domain = pyo.Binary)
-        )
+        # model.add_component(
+        #     f"bin_{self.name}",
+        #     pyo.Var(model.T, domain = pyo.Binary)
+        # )
 
         model.add_component(
             f"P_buy_{self.name}",
@@ -217,10 +217,10 @@ class IntraDay01(Market):
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
         )   
         # Variables
-        model.add_component(
-            f"bin_{self.name}",
-            pyo.Var(model.T, domain = pyo.Binary)
-        )
+        # model.add_component(
+        #     f"bin_{self.name}",
+        #     pyo.Var(model.T, domain = pyo.Binary)
+        # )
 
         model.add_component(
             f"P_buy_{self.name}",
@@ -370,10 +370,10 @@ class IntraDay02(Market):
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
         )   
         # Variables
-        model.add_component(
-            f"bin_{self.name}",
-            pyo.Var(model.T, domain = pyo.Binary)
-        )
+        # model.add_component(
+        #     f"bin_{self.name}",
+        #     pyo.Var(model.T, domain = pyo.Binary)
+        # )
 
         model.add_component(
             f"P_buy_{self.name}",
@@ -403,7 +403,7 @@ class IntraDay02(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export * getattr(model, f"bin_{self.name}")[t]
+                    <= m.system_capacity_export #* getattr(model, f"bin_{self.name}")[t]
                 )
             )
         )
@@ -414,7 +414,7 @@ class IntraDay02(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import * (1 - getattr(model, f"bin_{self.name}")[t])
+                    <= m.system_capacity_import #* (1 - getattr(model, f"bin_{self.name}")[t])
                 )
             )
         )
@@ -524,10 +524,10 @@ class IntraDay03(Market):
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
         )  
         # Variables
-        model.add_component(
-            f"bin_{self.name}",
-            pyo.Var(model.T, domain = pyo.Binary)
-        )
+        # model.add_component(
+        #     f"bin_{self.name}",
+        #     pyo.Var(model.T, domain = pyo.Binary)
+        # )
 
         model.add_component(
             f"P_buy_{self.name}",
@@ -557,7 +557,7 @@ class IntraDay03(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export * getattr(model, f"bin_{self.name}")[t]
+                    <= m.system_capacity_export #* getattr(model, f"bin_{self.name}")[t]
                 )
             )
         )
@@ -568,7 +568,7 @@ class IntraDay03(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import * (1 - getattr(model, f"bin_{self.name}")[t])
+                    <= m.system_capacity_import #* (1 - getattr(model, f"bin_{self.name}")[t])
                 )
             )
         )
