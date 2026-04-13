@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 import pyomo.environ as pyo
 from typing import Literal
-import random as rand
+import numpy as np
 
 class DayAhead(Market):
     """   
@@ -62,11 +62,7 @@ class DayAhead(Market):
             f"e_{self.name}",
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
         )       
-        # Variables
-        # model.add_component(
-        #     f"bin_{self.name}",
-        #     pyo.Var(model.T, domain = pyo.Binary)
-        # )
+
 
         model.add_component(
             f"P_buy_{self.name}",
@@ -77,18 +73,7 @@ class DayAhead(Market):
             f"P_sell_{self.name}",
             pyo.Var(model.T, domain = pyo.NonNegativeReals)
         )
-        # Constraints
-        # model.add_component(
-        #     f"output_market_limit_{self.name}",
-        #     pyo.Constraint(
-        #         model.T,
-        #         rule = lambda m, t: (
-        #             getattr(model, f"P_sell_{self.name}")[t] +
-        #             getattr(model, f"P_buy_{self.name}")[t]
-        #             <= getattr(model, f"e_{self.name}")[t]
-        #         )
-        #     )
-        # )
+
 
         model.add_component(
             f"sell_mode_limit_{self.name}",
@@ -96,7 +81,7 @@ class DayAhead(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export# * getattr(model, f"bin_{self.name}")[t]
+                    <= m.system_capacity_export
                 )
             )
         )
@@ -107,7 +92,7 @@ class DayAhead(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import# * (1 - getattr(model, f"bin_{self.name}")[t])
+                    <= m.system_capacity_import
                 )
             )
         )
@@ -125,11 +110,11 @@ class DayAhead(Market):
         )
 
         model.add_component(
-            f"Power_allocated_{self.name}",
+            f"Power_pre_allocated_{self.name}",
             pyo.Expression(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
+                    getattr(model, f"P_sell_{self.name}")[t] -
                     getattr(model, f"P_buy_{self.name}")[t]
                 )
             )
@@ -215,12 +200,7 @@ class IntraDay01(Market):
         model.add_component(
             f"e_{self.name}",
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
-        )   
-        # Variables
-        # model.add_component(
-        #     f"bin_{self.name}",
-        #     pyo.Var(model.T, domain = pyo.Binary)
-        # )
+        )
 
         model.add_component(
             f"P_buy_{self.name}",
@@ -250,7 +230,7 @@ class IntraDay01(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export# * getattr(model, f"bin_{self.name}")[t]
+                    <= m.system_capacity_export
                 )
             )
         )
@@ -261,7 +241,7 @@ class IntraDay01(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import# * (1 - getattr(model, f"bin_{self.name}")[t])
+                    <= m.system_capacity_import
                 )
             )
         )
@@ -279,11 +259,11 @@ class IntraDay01(Market):
         )
 
         model.add_component(
-            f"Power_allocated_{self.name}",
+            f"Power_pre_allocated_{self.name}",
             pyo.Expression(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
+                    getattr(model, f"P_sell_{self.name}")[t] -
                     getattr(model, f"P_buy_{self.name}")[t]
                 )
             )
@@ -369,11 +349,6 @@ class IntraDay02(Market):
             f"e_{self.name}",
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
         )   
-        # Variables
-        # model.add_component(
-        #     f"bin_{self.name}",
-        #     pyo.Var(model.T, domain = pyo.Binary)
-        # )
 
         model.add_component(
             f"P_buy_{self.name}",
@@ -403,7 +378,7 @@ class IntraDay02(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export #* getattr(model, f"bin_{self.name}")[t]
+                    <= m.system_capacity_export
                 )
             )
         )
@@ -414,7 +389,7 @@ class IntraDay02(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import #* (1 - getattr(model, f"bin_{self.name}")[t])
+                    <= m.system_capacity_import
                 )
             )
         )
@@ -432,11 +407,11 @@ class IntraDay02(Market):
         )
 
         model.add_component(
-            f"Power_allocated_{self.name}",
+            f"Power_pre_allocated_{self.name}",
             pyo.Expression(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
+                    getattr(model, f"P_sell_{self.name}")[t] -
                     getattr(model, f"P_buy_{self.name}")[t]
                 )
             )
@@ -522,12 +497,7 @@ class IntraDay03(Market):
         model.add_component(
             f"e_{self.name}",
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
-        )  
-        # Variables
-        # model.add_component(
-        #     f"bin_{self.name}",
-        #     pyo.Var(model.T, domain = pyo.Binary)
-        # )
+        )
 
         model.add_component(
             f"P_buy_{self.name}",
@@ -557,7 +527,7 @@ class IntraDay03(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export #* getattr(model, f"bin_{self.name}")[t]
+                    <= m.system_capacity_export
                 )
             )
         )
@@ -568,7 +538,7 @@ class IntraDay03(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import #* (1 - getattr(model, f"bin_{self.name}")[t])
+                    <= m.system_capacity_import
                 )
             )
         )
@@ -586,11 +556,11 @@ class IntraDay03(Market):
         )
 
         model.add_component(
-            f"Power_allocated_{self.name}",
+            f"Power_pre_allocated_{self.name}",
             pyo.Expression(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
+                    getattr(model, f"P_sell_{self.name}")[t] -
                     getattr(model, f"P_buy_{self.name}")[t]
                 )
             )
@@ -736,9 +706,6 @@ class AFRR(Market):
         band_afrr_up = self.datasets["band_afrr_up"]["value"].to_dict()
         band_afrr_down = self.datasets["band_afrr_down"]["value"].to_dict()
 
-        # TODO change e_afrr_act_up and e_afrr_act_down for the activated energy for the unit. Param self.act: Literal[str...]
-        # TODO only one of the two params can be != 0 for each t.
-        # TODO both params need to be a value between 0 and 1 being the % of the band that is gonna be activated.
         e_afrr_act_up, e_afrr_act_down = self._energy_activation_requirements()
 
         # Sets
@@ -826,7 +793,7 @@ class AFRR(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"Band_up_{self.name}")[t]
-                    <= m.system_capacity_export # Crear una expresion que calcule la banda disponible a subir
+                    <= m.system_capacity_export
                 )
             )
         )
@@ -837,7 +804,7 @@ class AFRR(Market):
                 model.T,
                 rule = lambda m, t: (
                     getattr(model, f"Band_down_{self.name}")[t]
-                    <= m.system_capacity_import # Crear una expresion que calcule la banda disponible a bajar
+                    <= m.system_capacity_import
                 )
             )
         )
@@ -869,8 +836,6 @@ class AFRR(Market):
         )
 
         # Expressions
-            # TODO decide if the activated energy (P_up and P_down) goes into the equation of allocated energy,
-            # TODO or the allocated band (Band_up and Band_down).
         model.add_component(
             f"Market_output_{self.name}",
             pyo.Expression(
@@ -883,12 +848,11 @@ class AFRR(Market):
         )
 
         model.add_component(
-            f"Power_allocated_{self.name}",
+            f"Power_pre_allocated_{self.name}",
             pyo.Expression(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_up_{self.name}")[t] +
-                    getattr(model, f"P_down_{self.name}")[t]
+                    0
                 )
             )
         )
@@ -949,11 +913,13 @@ class AFRR(Market):
 
         index = self.datasets["e_afrr_act_up"].index
         _perc_affr_act_up = pd.DataFrame(
-            # data = self.datasets["e_afrr_act_up"]["value"] / self.datasets["band_afrr_up"]["value"],
             index = index
         )
         _perc_affr_act_down = pd.DataFrame(
-            # data = self.datasets["e_afrr_act_down"]["value"] / self.datasets["band_afrr_down"]["value"],
+            index = index
+        )
+
+        df_statistics = pd.DataFrame(
             index = index
         )
 
@@ -961,13 +927,69 @@ class AFRR(Market):
             case None:
                 _perc_affr_act_up["value"] = 0
                 _perc_affr_act_down["value"] = 0
+
             case "bin_prop":
-                _perc_affr_act_up["value"] = self.datasets["e_afrr_act_up"]["value"] / self.datasets["band_afrr_up"]["value"]
-                _perc_affr_act_down["value"] = self.datasets["e_afrr_act_down"]["value"] / self.datasets["band_afrr_down"]["value"]
+                df_statistics["prob_up"] = 4 * self.datasets["e_afrr_act_up"]["value"] / self.datasets["band_afrr_up"]["value"]
+                df_statistics["prob_down"] = 4 * self.datasets["e_afrr_act_down"]["value"] / self.datasets["band_afrr_down"]["value"]
+
+                coin = np.random.rand(len(df_statistics)) < 0.5
+                rand_up = np.random.rand(len(df_statistics))
+                rand_down = np.random.rand(len(df_statistics))
+
+                df_temp_up = rand_up < df_statistics["prob_up"]
+                df_temp_down = rand_down < df_statistics["prob_down"]
+                print(df_temp_up)
+                print(df_temp_down)
+                tie = df_temp_up & df_temp_down
+
+                up_wins_tie = (df_statistics["prob_up"] > df_statistics["prob_down"]) | ((df_statistics["prob_up"] == df_statistics["prob_down"]) & coin)
+                down_wins_tie = (df_statistics["prob_down"] > df_statistics["prob_up"]) | ((df_statistics["prob_up"] == df_statistics["prob_down"]) & ~coin)
+
+                df_statistics["act_up"] = (df_temp_up & ~df_temp_down) | (tie & up_wins_tie)
+                df_statistics["act_down"] = (df_temp_down & ~df_temp_up) | (tie & down_wins_tie)
+
+                _perc_affr_act_up["value"] = df_statistics["act_up"] * df_statistics["prob_up"]
+                _perc_affr_act_down["value"] = df_statistics["act_down"] * df_statistics["prob_down"]
+
             case "bin_max":
-                pass
+                df_statistics["prob_up"] = 4 * self.datasets["e_afrr_act_up"]["value"] / self.datasets["band_afrr_up"]["value"]
+                df_statistics["prob_down"] = 4 * self.datasets["e_afrr_act_down"]["value"] / self.datasets["band_afrr_down"]["value"]
+
+                coin = np.random.rand(len(df_statistics)) < 0.5
+                rand_up = np.random.rand(len(df_statistics))
+                rand_down = np.random.rand(len(df_statistics))
+
+                df_temp_up = rand_up < df_statistics["prob_up"]
+                df_temp_down = rand_down < df_statistics["prob_down"]
+                print(df_temp_up)
+                print(df_temp_down)
+                tie = df_temp_up & df_temp_down
+
+                up_wins_tie = (df_statistics["prob_up"] > df_statistics["prob_down"]) | ((df_statistics["prob_up"] == df_statistics["prob_down"]) & coin)
+                down_wins_tie = (df_statistics["prob_down"] > df_statistics["prob_up"]) | ((df_statistics["prob_up"] == df_statistics["prob_down"]) & ~coin)
+
+                df_statistics["act_up"] = (df_temp_up & ~df_temp_down) | (tie & up_wins_tie)
+                df_statistics["act_down"] = (df_temp_down & ~df_temp_up) | (tie & down_wins_tie)
+
+                _perc_affr_act_up["value"] = df_statistics["act_up"] * 1
+                _perc_affr_act_down["value"] = df_statistics["act_down"] * 1
+
             case "rand":
-                pass
+                coin = np.random.rand(len(df_statistics)) < 0.5
+                rand_up = np.random.rand(len(df_statistics))
+                rand_down = np.random.rand(len(df_statistics))
+
+                tie = rand_up & rand_down
+
+                up_wins_tie = (rand_up > rand_down) | ((rand_up == rand_down) & coin)
+                down_wins_tie = (rand_down > rand_up) | ((rand_up == rand_down) & ~coin)
+
+                # Resultado final (mutuamente excluyente)
+                df_statistics["act_up"] = (df_temp_up & ~df_temp_down) | (tie & up_wins_tie)
+                df_statistics["act_down"] = (df_temp_down & ~df_temp_up) | (tie & down_wins_tie)
+
+                _perc_affr_act_up["value"] = df_statistics["act_up"] * df_statistics["prob_up"]
+                _perc_affr_act_down["value"] = df_statistics["act_down"] * df_statistics["prob_down"]
 
         e_afrr_act_up = _perc_affr_act_up
         e_afrr_act_down = _perc_affr_act_down
@@ -1064,12 +1086,11 @@ class MFRR(Market):
 
         # Expressions
         model.add_component(
-            f"Power_allocated_{self.name}",
+            f"Power_pre_allocated_{self.name}",
             pyo.Expression(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
-                    getattr(model, f"P_buy_{self.name}")[t]
+                    0
                 )
             )
         )

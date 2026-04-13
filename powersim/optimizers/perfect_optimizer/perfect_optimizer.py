@@ -212,34 +212,21 @@ class PerfectOptimizer(BaseOptimizer):
             rule = market_sell_limit
         )
 
-        # def market_buy_limit(m, t):
-        #     return (
-        #         sum(
-        #             - getattr(m, f"Market_output_{market.__class__.__name__}")[t]
-        #             for market in self.markets
-        #         ) <= m.P_import[t] / self.system.efficiency
-        #     )
+        # Expressions
+        def total_power_pre_allocated(m, t):
+            return (
+                sum(
+                    getattr(m, f"Power_pre_allocated_{market.__class__.__name__}")[t]
+                    for market in self.markets
+                )
+            )
         
-        # self.model.market_buy_limit = pyo.Constraint(
-        #     self.model.T,
-        #     rule = market_buy_limit
-        # )
-
-        # def market_balance_rule(m, t):
-        #     return (
-        #         sum(
-        #             getattr(m, f"Power_allocated_{market.__class__.__name__}")[t]
-        #             for market in self.markets
-        #         )
-        #         ==
-        #         self.system.efficiency * m.P_export[t] + 
-        #         m.P_import[t] / self.system.efficiency
-        #     )
-
-        # self.model.market_balance = pyo.Constraint(
-        #     self.model.T,
-        #     rule = market_balance_rule
-        # )
+        self.model.add_component(
+            f"Total_power_pre_allocated_",
+            pyo.Expression(
+                self.model.T, rule = total_power_pre_allocated
+            )
+        )
 
         return self.model
     
