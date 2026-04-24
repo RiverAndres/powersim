@@ -22,8 +22,9 @@ class SimulationResult:
         self.operation_system = self.system.results(self.simulation)
 
         # self.operation_system: df that contains timeseries of the operation of the system.
-        self.operation_system["P_grid_import"] = - self.operation_system["P_grid_import"]
-        self.operation_system["P_grid_export"] = self.operation_system["P_grid_export"] * self.system.efficiency
+        system_output = self.operation_system["P_grid_export"] - self.operation_system["P_grid_import"]
+        self.operation_system["P_grid_import"] = system_output.clip(upper = 0)
+        self.operation_system["P_grid_export"] = system_output.clip(lower = 0) * self.system.efficiency
         self.operation_system["E_grid_buy"] = self.operation_system["P_grid_import"] * self.operation_system["dt"]
         self.operation_system["E_grid_sell"] = self.operation_system["P_grid_export"] * self.operation_system["dt"]
         self.operation_system["P_excess"] = self.operation_system["P_excess"]
@@ -33,13 +34,15 @@ class SimulationResult:
         self.operation_storage[["P_charge", "P_discharge", "E_charge", "E_discharge"]] = 0
 
         for storage in self.operation_storage_list:
+            storage_p_output = storage["P_discharge"] - storage["P_charge"]
+            storage_e_output = storage["E_discharge"] - storage["E_charge"]
             storage["P_charge"] = - storage["P_charge"]
             storage["E_charge"] = - storage["E_charge"]
             storage_name = storage["name"].iloc[0]
-            self.operation_storage["P_charge"] += storage["P_charge"]
-            self.operation_storage["P_discharge"] += storage["P_discharge"]
-            self.operation_storage["E_charge"] += storage["E_charge"]
-            self.operation_storage["E_discharge"] += storage["E_discharge"]
+            self.operation_storage["P_charge"] += storage_p_output.clip(upper = 0)
+            self.operation_storage["P_discharge"] += storage_p_output.clip(lower = 0)
+            self.operation_storage["E_charge"] += storage_e_output.clip(upper = 0)
+            self.operation_storage["E_discharge"] += storage_e_output.clip(lower = 0)
             self.operation_storage[f"SOC_{storage_name}"] = storage["SOC"]
             self.operation_storage[f"charge_{storage_name}"] = storage["charge"]
             self.operation_storage[f"discharge_{storage_name}"] = storage["discharge"]
@@ -88,24 +91,27 @@ class SimulationResult:
 
         # self.operation_timeseries: df that contains timeseries information to use to plot, or export data.
         self.operation_timeseries = pd.DataFrame(index = self.operation_system.index)
-        # self.operation_timeseries["P_system_sell_storage"] = self.operation_storage["P_discharge"] * self.system.efficiency 
-        # self.operation_timeseries["P_system_sell_generation"] = pd.Series(self.operation_generation["P_gen"] * self.system.efficiency + self.operation_storage["P_charge"] + self.operation_system["P_grid_import"] - self.operation_system["P_excess"]).clip(lower = 0)
         self.operation_timeseries["P_system_import"] = self.operation_system["P_grid_import"]
         self.operation_timeseries["P_system_export"] = self.operation_system["P_grid_export"]
-        # self.operation_timeseries["P_system_buy"] = self.operation_system["P_grid_import"]
         self.operation_timeseries["P_generation"] = self.operation_generation["P_gen"]
         self.operation_timeseries["P_excess"] = self.operation_system["P_excess"]
-        # self.operation_timeseries["P_storage_charge_generation"] = pd.Series(- self.operation_generation["P_gen"] + self.operation_system["P_excess"] + self.operation_system["P_grid_export"] / self.system.efficiency).clip(upper = 0)
-        # self.operation_timeseries["P_storage_charge_grid"] = self.operation_system["P_grid_import"] * self.system.efficiency
         self.operation_timeseries["P_storage_charge"] = self.operation_storage["P_charge"]
         self.operation_timeseries["P_storage_discharge"] = self.operation_storage["P_discharge"]
 
-        # self.operation_timeseries["E_buy"] = self.operation_comercialization["E_buy"]
-        # self.operation_timeseries["E_sell"] = self.operation_comercialization["E_sell"]
-        # self.operation_timeseries["B_buy"] = self.operation_comercialization["B_buy"]
-        # self.operation_timeseries["B_sell"] = self.operation_comercialization["B_sell"]
-        # self.operation_timeseries["B_benefit"] = self.operation_comercialization["B_benefit"]
+        self.operation_timeseries["P_system_sell_generation"] = pd.Series(self.operation_generation["P_gen"].clip(upper = 0) + self.operation_generation["P_gen"].clip(lower = 0) * self.system.efficiency + self.operation_storage["P_charge"] + self.operation_system["P_grid_import"] - self.operation_system["P_excess"]).clip(lower = 0)
+        self.operation_timeseries["P_system_sell_storage"] = pd.Series(self.operation_storage["P_discharge"] * self.system.efficiency + self.operation_generation["P_gen"].clip(upper = 0)).clip(lower = 0)
 
+        self.operation_timeseries["P_storage_charge_generation"] = pd.Series(- self.operation_generation["P_gen"].clip(lower = 0) + self.operation_system["P_excess"] + self.operation_system["P_grid_export"] / self.system.efficiency).clip(upper = 0)
+        self.operation_timeseries["P_storage_charge_grid"] = self.operation_system["P_grid_import"] * self.system.efficiency - self.operation_generation["P_gen"].clip(upper = 0)
+
+        self.operation_timeseries["E_system_sell_generation"] = self.operation_timeseries["P_system_sell_generation"] * self.operation_system["dt"]
+        self.operation_timeseries["E_system_sell_storage"] = self.operation_timeseries["P_system_sell_storage"] * self.operation_system["dt"]
+
+        self.operation_timeseries["E_storage_charge_generation"] = self.operation_timeseries["P_storage_charge_generation"] * self.operation_system["dt"]
+        self.operation_timeseries["E_storage_charge_grid"] = self.operation_timeseries["P_storage_charge_grid"] * self.operation_system["dt"]
+        
+        # self.operation_timeseries["B_system_sell_generation_DA"] = self.operation_timeseries[f"p_DayAhead"] * (self.operation_timeseries["E_system_sell_generation"])
+        # self.operation_timeseries["B_system_sell_storage_DA"] = self.operation_timeseries[f"p_DayAhead"] * (self.operation_timeseries["E_system_sell_storage"] - self.operation_timeseries["E_system_sell_generation"]).clip(lower = 0)
 
         for storage in self.operation_storage_list:
             storage_name = storage["name"].iloc[0]
@@ -134,7 +140,7 @@ class SimulationResult:
                 self.operation_timeseries[f"B_act_up_{name}"] = self.operation_market[f"B_act_up_{name}"]
                 self.operation_timeseries[f"B_act_down_{name}"] = self.operation_market[f"B_act_down_{name}"]
                 self.operation_timeseries[f"B_benefit_{name}"] = self.operation_market[f"B_benefit_{name}"]
-            else:    
+            else:
                 self.operation_timeseries[f"p_{name}"] = self.operation_market[f"p_{name}"]
                 self.operation_timeseries[f"P_sell_{name}"] = self.operation_market[f"P_sell_{name}"]
                 self.operation_timeseries[f"P_buy_{name}"] = self.operation_market[f"P_buy_{name}"]
@@ -159,6 +165,8 @@ class SimulationResult:
         # self.operation_timeseries_quarter = self.operation_timeseries[agg_data_format.keys()].resample("QS").agg(agg_data_format)
         # self.operation_timeseries_year = self.operation_timeseries[agg_data_format.keys()].resample("YS").agg(agg_data_format)
 
+        self.operation_timeseries_year = self.operation_timeseries.resample("YS").sum()
+
     def plot_operation(self):
         """
         Detailed graphs that shopw the timeseries of the operation of the system and the exchanges of enrgy between modules and the grid.
@@ -174,8 +182,8 @@ class SimulationResult:
                 f"P_buy_IntraDay02":"mediumseagreen",
                 f"P_sell_IntraDay03":"forestgreen",
                 f"P_buy_IntraDay03":"forestgreen",
-                f"Band_up_AFRR":"orangered",
-                f"Band_down_AFRR":"orangered",
+                f"Band_up_AFRR":"lightsalmon",
+                f"Band_down_AFRR":"lightsalmon",
                 f"P_up_AFRR":"red",
                 f"P_down_AFRR":"red",
                 f"P_sell_MFRR":"gold",
@@ -185,10 +193,10 @@ class SimulationResult:
                 f"p_IntraDay01":"mediumspringgreen",
                 f"p_IntraDay02":"mediumseagreen",
                 f"p_IntraDay03":"forestgreen",
-                f"p_up_AFRR":"orangered",
-                f"p_down_AFRR":"orangered",
-                f"p_act_up_AFRR":"orangered",
-                f"p_act_down_AFRR":"orangered",
+                f"p_up_AFRR":"lightsalmon",
+                f"p_down_AFRR":"lightsalmon",
+                f"p_act_up_AFRR":"red",
+                f"p_act_down_AFRR":"red",
                 f"p_MFRR":"gold",
             }
         }
@@ -241,13 +249,13 @@ class SimulationResult:
                 self.operation_timeseries.plot(y = f"p_act_up_{name}", kind = "line", ax = ax_market_prices, color = styles["colors"][f"p_act_up_{name}"])
                 self.operation_timeseries.plot(y = f"p_act_down_{name}", kind = "line", ax = ax_market_prices, color = styles["colors"][f"p_act_down_{name}"])
 
-                self.operation_timeseries.plot(y = f"Band_up_{name}", kind = "area", ax = ax_market_operation, color = styles["colors"][f"Band_up_{name}"], linewidth = 0.1, alpha = 0.5)
-                self.operation_timeseries.plot(y = f"Band_down_{name}", kind = "area", ax = ax_market_operation, color = styles["colors"][f"Band_down_{name}"], linewidth = 0.1, alpha = 0.5)
+                # self.operation_timeseries.plot(y = f"Band_up_{name}", kind = "area", ax = ax_market_operation, color = styles["colors"][f"Band_up_{name}"], linewidth = 0.1, alpha = 0.5)
+                # self.operation_timeseries.plot(y = f"Band_down_{name}", kind = "area", ax = ax_market_operation, color = styles["colors"][f"Band_down_{name}"], linewidth = 0.1, alpha = 0.5)
                 # self.operation_timeseries.plot(y = f"P_up_{name}", kind = "area", ax = ax_market_operation, color = styles["colors"][f"P_up_{name}"], linewidth = 0.1, stacked = True)
                 # self.operation_timeseries.plot(y = f"P_down_{name}", kind = "area", ax = ax_market_operation, color = styles["colors"][f"P_down_{name}"], linewidth = 0.1, stacked = True)
                 
-                stacked_area_plots += [f"P_up_{name}", f"P_down_{name}"]
-                colors_area_plots += [styles["colors"][f"P_up_{name}"], styles["colors"][f"P_down_{name}"]]
+                stacked_area_plots += [f"P_up_{name}", f"P_down_{name}", f"Band_up_{name}", f"Band_down_{name}"]
+                colors_area_plots += [styles["colors"][f"P_up_{name}"], styles["colors"][f"P_down_{name}"], styles["colors"][f"Band_up_{name}"], styles["colors"][f"Band_down_{name}"]]
 
             else:
                 self.operation_timeseries.plot(y = f"p_{name}", kind = "line", ax = ax_market_prices, color = styles["colors"][f"p_{name}"])

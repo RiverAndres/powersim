@@ -164,7 +164,7 @@ class Photovoltaic():
 
     def __str__(self):
         return f"""\
-Photovoltaic; Name {self.name} ; Peak power {self.peak_power:.2f} MWp ; Lat {self.latitude:.4f}º ; Lon {self.longitude:.4f}º ; Tracker {self.tracker} ; Tilt {self.tilt:.2f} ; Azimuth {self.azimuth:.2f} ; Losses {self.losses:.2f}\
+Photovoltaic; Name {self.name} ; Peak power {self.peak_power} MWp ; Lat {self.latitude}º ; Lon {self.longitude}º ; Tracker {self.tracker} ; Tilt {self.tilt} ; Azimuth {self.azimuth:.2f} ; Losses {self.losses:.2f}\
 """
     
     def __repr__(self):
@@ -412,7 +412,7 @@ Battery; Name {self.name} ; Capacity {self.capacity:.2f} MW ; RTE {self.rte:.2f}
         return f"""\
 Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self.c_rate}, dod={self.dod}, soc_max={self.soc_max}, soc_initial={self.soc_initial}, max_cycles_day={self.max_cycles_day}, max_cycles_day_monthly_avg={self.max_cycles_day_monthly_avg}, max_cycles_day_yearly_avg={self.max_cycles_day_yearly_avg}, max_power_output={self.max_power_output}, min_power_output={self.min_power_output}, rsoc={self.rsoc}, resting_period={self.resting_period})\
 """
-    def _base_lp_components(self, model: pyo.ConcreteModel):
+    def _base_components(self, model: pyo.ConcreteModel):
         b = self.name
 
         def soc_balance(m, t):
@@ -458,7 +458,7 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
             ),
         )
 
-    def _additional_milp_components(self, model: pyo.ConcreteModel):
+    def _additional_components(self, model: pyo.ConcreteModel):
         b = self.name
         day = model.D # SET of days
         month = model.M # set of months
@@ -787,9 +787,9 @@ Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self
         ]
         additional_components = sum([bool(component) for component in components])  
 
-        self._base_lp_components(model = model)
+        self._base_components(model = model)
         if additional_components:
-            self._additional_milp_components(model = model)
+            self._additional_components(model = model)
 
     def results(self, model: pyo.ConcreteModel):
         records = []

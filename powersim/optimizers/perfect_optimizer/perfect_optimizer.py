@@ -36,7 +36,7 @@ class PerfectOptimizer(BaseOptimizer):
 
         for g in self.system.generators:
             g.production = g.production.reindex(time_index, method = "ffill")
-
+            
         if len(self.system.batteries) == 0:
             self.system.capacity_buy = 0
 
@@ -95,9 +95,9 @@ class PerfectOptimizer(BaseOptimizer):
 
             ## SYSTEM VARIABLES
         # self.model.bin_system = pyo.Var(self.model.T, domain = pyo.Binary)
-        self.model.P_import = pyo.Var(self.model.T, domain = pyo.NonNegativeReals)
-        self.model.P_export = pyo.Var(self.model.T, domain = pyo.NonNegativeReals)
-        self.model.P_excess = pyo.Var(self.model.T, domain = pyo.NonNegativeReals)
+        self.model.P_import = pyo.Var(self.model.T, domain = pyo.NonNegativeReals, initialize = 0)
+        self.model.P_export = pyo.Var(self.model.T, domain = pyo.NonNegativeReals, initialize = 0)
+        self.model.P_excess = pyo.Var(self.model.T, domain = pyo.NonNegativeReals, initialize = 0)
 
             ## BATTERY VARIABLES
         self.model.P_charge = pyo.Var(self.model.B, self.model.T, domain = pyo.NonNegativeReals)
@@ -109,19 +109,45 @@ class PerfectOptimizer(BaseOptimizer):
         self.model.rest = pyo.Var(self.model.B, self.model.T, within = pyo.Binary, initialize = 0)
         self.model.RSOC = pyo.Var(self.model.B, self.model.T, within = pyo.NonNegativeReals, initialize = 0)
 
+        # EXTERNAL COMPONENTS
+        for battery in self.system.batteries:
+            battery.components(self.model)
+
+        for market in self.markets:
+            market.components(self.model)
+
+        # EXPRESSIONS
+        def total_power_pre_allocated(m, t):
+            return (
+                sum(
+                    getattr(m, f"Power_pre_allocated_{market.__class__.__name__}")[t]
+                    for market in self.markets
+                )
+            )
+        
+        self.model.add_component(
+            f"Total_power_pre_allocated",
+            pyo.Expression(
+                self.model.T, rule = total_power_pre_allocated
+            )
+        )
+
         # SYSTEM CONSTRAINTS
             ## Balance between modules and system
         def system_balance_rule(m, t):
             generation = sum(
-                g.power_at(t) for g in self.system.generators
+                (g.power_at(t) for g in self.system.generators),
+                0
             )
 
             discharge = sum(
-                m.P_discharge[b, t] for b in m.B
+                (m.P_discharge[b, t] for b in m.B),
+                0
             )
 
             charge = sum(
-                m.P_charge[b, t] for b in m.B
+                (m.P_charge[b, t] for b in m.B),
+                0
             )
 
             if len(self.system.batteries) == 0:
@@ -144,29 +170,17 @@ class PerfectOptimizer(BaseOptimizer):
             self.model.T, rule = system_balance_rule
         )
 
-        # self.model.import_limit = pyo.Constraint(
-        #     self.model.T,
-        #     rule = lambda m, t: m.P_import[t]
-        #     <= m.system_capacity_export,
-        # )
-
-        # self.model.export_limit = pyo.Constraint(
-        #     self.model.T,
-        #     rule = lambda m, t: m.P_export[t]
-        #     <= m.system_capacity_import,
-        # )
-
-        self.model.export_mode_limit = pyo.Constraint(
+        self.model.export_limit = pyo.Constraint(
             self.model.T,
             rule = lambda m, t: (m.P_export[t]
-                <= m.system_capacity_export# * m.bin_system[t]
+                <= m.system_capacity_export
             )
         )
 
-        self.model.import_mode_limit = pyo.Constraint(
+        self.model.import_limit = pyo.Constraint(
             self.model.T,
             rule = lambda m, t: (m.P_import[t]
-                <= m.system_capacity_import# * (1 - m.bin_system[t])
+                <= m.system_capacity_import
             )
         )
 
@@ -190,13 +204,7 @@ class PerfectOptimizer(BaseOptimizer):
             self.model.T, rule = excess_power_rule
         )
 
-        for battery in self.system.batteries:
-            battery.components(self.model)
-
-        for market in self.markets:
-            market.components(self.model)
-
-        # MARKET CONSTRAINTS
+        # MARKET GLOBAL CONSTRAINTS
             ## Balace between markets and output power
 
         def market_sell_limit(m, t):
@@ -204,7 +212,7 @@ class PerfectOptimizer(BaseOptimizer):
                 sum(
                     getattr(m, f"Market_output_{market.__class__.__name__}")[t]
                     for market in self.markets
-                ) == m.P_export[t] * self.system.efficiency - m.P_import[t] / self.system.efficiency
+                ) == m.P_export[t] * self.system.efficiency - m.P_import[t]
             )
         
         self.model.market_sell_limit = pyo.Constraint(
@@ -212,32 +220,63 @@ class PerfectOptimizer(BaseOptimizer):
             rule = market_sell_limit
         )
 
-        # Expressions
-        def total_power_pre_allocated(m, t):
-            return (
-                sum(
-                    getattr(m, f"Power_pre_allocated_{market.__class__.__name__}")[t]
-                    for market in self.markets
+            ## Limitation in Band_up and Band_down
+        for market in self.markets:
+            if market.__class__.__name__ == "AFRR":
+                self.model.add_component(
+                    f"band_up_operational_limit_{market.__class__.__name__}",
+                    pyo.Constraint(
+                        self.model.T,
+                        rule = lambda m, t: (
+                            getattr(self.model, f"Band_up_{market.__class__.__name__}")[t]
+                            <= m.system_capacity_export - getattr(self.model, f"Total_power_pre_allocated")[t]
+                        )
+                    )
                 )
-            )
-        
-        self.model.add_component(
-            f"Total_power_pre_allocated_",
-            pyo.Expression(
-                self.model.T, rule = total_power_pre_allocated
-            )
-        )
 
+                self.model.add_component(
+                    f"band_down_operational_limit_{market.__class__.__name__}",
+                    pyo.Constraint(
+                        self.model.T,
+                        rule = lambda m, t: (
+                            getattr(self.model, f"Band_down_{market.__class__.__name__}")[t]
+                            <= m.system_capacity_import + getattr(self.model, f"Total_power_pre_allocated")[t]
+                        )
+                    )
+                )
+
+                # self.model.export = pyo.Var(self.model.T, within = pyo.Binary, initialize = 0)
+
+                # def export_mode(m, t):
+                #     return m.P_import[t] <= m.system_capacity_import * m.export[t]
+
+                # self.model.add_component(
+                #     f"export_mode",
+                #     pyo.Constraint(
+                #         self.model.T, rule = export_mode
+                #     )
+                # )
+
+                # def import_mode(m, t):
+                #     return m.P_export[t] <= m.system_capacity_export * (1 - m.export[t])
+
+                # self.model.add_component(
+                #     f"import_mode",
+                #     pyo.Constraint(
+                #         self.model.T, rule = import_mode
+                #     )
+                # )
+                
         return self.model
     
-
-    
     def _objective_maximize_revenues(self) -> pyo.ConcreteModel:
-        
+        epsilon = 1e-3
         self.model.objective = pyo.Objective(
-            expr = sum(
+            expr = (
+                sum(
                 getattr(self.model, f"Revenues_{market.__class__.__name__}")
                 for market in self.markets
+                )
             ),
             sense = pyo.maximize,
         )
@@ -287,5 +326,4 @@ class PerfectOptimizer(BaseOptimizer):
         self._objective_maximize_revenues()
         self._solve()
         
-
         return self

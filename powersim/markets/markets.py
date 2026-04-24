@@ -63,7 +63,7 @@ class DayAhead(Market):
             pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
         )       
 
-
+        # Variables
         model.add_component(
             f"P_buy_{self.name}",
             pyo.Var(model.T, domain = pyo.NonNegativeReals)
@@ -605,10 +605,18 @@ class AFRR(Market):
     """
     Class that represents the aFRR market.
     """
-    def __init__(self, act:Literal["bin_prop", "bin_max", "rand"] | None = None):
+    def __init__(
+            self,
+            max_up: float | None = None,
+            max_down: float | None = None,
+            act:Literal["bin_prop", "bin_max", "rand"] | None = None
+            ):
+        
         self.name = self.__class__.__name__
         self.datasets: dict[str, pd.DataFrame] = {}
-        self.act = act
+        self._act = act
+        self._max_up = max_up
+        self._max_down = max_down
 
     def get_info(self, esios_token:str, start_date:str, end_date:str, use_cache = False):
         fmt = "%Y/%m/%dT%H:%M:%SZ"
@@ -707,6 +715,14 @@ class AFRR(Market):
         band_afrr_down = self.datasets["band_afrr_down"]["value"].to_dict()
 
         e_afrr_act_up, e_afrr_act_down = self._energy_activation_requirements()
+        max_afrr_up = model.system_capacity_export
+        max_afrr_down = model.system_capacity_import
+
+        if self._max_up:
+            max_afrr_up = min(self._max_up, model.system_capacity_export)
+
+        if self._max_down:
+            max_afrr_down = min(self._max_down, model.system_capacity_import)
 
         # Sets
             # NONE
@@ -792,8 +808,8 @@ class AFRR(Market):
             pyo.Constraint(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"Band_up_{self.name}")[t]
-                    <= m.system_capacity_export
+                    getattr(m, f"Band_up_{self.name}")[t]
+                    <= max_afrr_up
                 )
             )
         )
@@ -803,8 +819,8 @@ class AFRR(Market):
             pyo.Constraint(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"Band_down_{self.name}")[t]
-                    <= m.system_capacity_import
+                    getattr(m, f"Band_down_{self.name}")[t]
+                    <= max_afrr_down
                 )
             )
         )
@@ -814,10 +830,10 @@ class AFRR(Market):
             pyo.Constraint(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_up_{self.name}")[t] # Var
+                    getattr(m, f"P_up_{self.name}")[t] # Var
                     == 
-                    getattr(model, f"e_act_up_{self.name}")[t] * # Param from 0 to 1
-                    getattr(model, f"Band_up_{self.name}")[t] # Var ofered act band
+                    getattr(m, f"e_act_up_{self.name}")[t] * # Param from 0 to 1
+                    getattr(m, f"Band_up_{self.name}")[t] # Var ofered act band
                 )
             )
         )
@@ -827,10 +843,10 @@ class AFRR(Market):
             pyo.Constraint(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_down_{self.name}")[t]
+                    getattr(m, f"P_down_{self.name}")[t]
                     == 
-                    getattr(model, f"e_act_down_{self.name}")[t] *
-                    getattr(model, f"Band_up_{self.name}")[t]
+                    getattr(m, f"e_act_down_{self.name}")[t] *
+                    getattr(m, f"Band_up_{self.name}")[t]
                 )
             )
         )
@@ -841,8 +857,8 @@ class AFRR(Market):
             pyo.Expression(
                 model.T,
                 rule = lambda m, t: (
-                    getattr(model, f"P_up_{self.name}")[t] -
-                    getattr(model, f"P_down_{self.name}")[t]
+                    getattr(m, f"P_up_{self.name}")[t] -
+                    getattr(m, f"P_down_{self.name}")[t]
                 )
             )
         )
@@ -864,9 +880,9 @@ class AFRR(Market):
                     (getattr(model, f"Band_up_{self.name}")[t] * getattr(model, f"p_up_{self.name}")[t]) +
                     (getattr(model, f"Band_down_{self.name}")[t] * getattr(model, f"p_down_{self.name}")[t]) +
                     (
-                        (getattr(model, f"P_up_{self.name}")[t] * getattr(model, f"p_act_up_{self.name}")[t]) -
-                        (getattr(model, f"P_down_{self.name}")[t] * getattr(model, f"p_act_down_{self.name}")[t])
-                    ) *
+                        (getattr(model, f"P_up_{self.name}")[t] * getattr(model, f"p_act_up_{self.name}")[t]) +
+                        (- getattr(model, f"P_down_{self.name}")[t] * getattr(model, f"p_act_down_{self.name}")[t])
+                    ) * 
                     model.dt[t]
                     for t in model.T
                 )
@@ -909,7 +925,7 @@ class AFRR(Market):
         of activation percentages both aFRR activation up and down.
         """
         # TODO
-        self.act
+        self._act
 
         index = self.datasets["e_afrr_act_up"].index
         _perc_affr_act_up = pd.DataFrame(
@@ -923,7 +939,7 @@ class AFRR(Market):
             index = index
         )
 
-        match self.act:
+        match self._act:
             case None:
                 _perc_affr_act_up["value"] = 0
                 _perc_affr_act_down["value"] = 0
@@ -938,8 +954,6 @@ class AFRR(Market):
 
                 df_temp_up = rand_up < df_statistics["prob_up"]
                 df_temp_down = rand_down < df_statistics["prob_down"]
-                print(df_temp_up)
-                print(df_temp_down)
                 tie = df_temp_up & df_temp_down
 
                 up_wins_tie = (df_statistics["prob_up"] > df_statistics["prob_down"]) | ((df_statistics["prob_up"] == df_statistics["prob_down"]) & coin)
@@ -961,8 +975,6 @@ class AFRR(Market):
 
                 df_temp_up = rand_up < df_statistics["prob_up"]
                 df_temp_down = rand_down < df_statistics["prob_down"]
-                print(df_temp_up)
-                print(df_temp_down)
                 tie = df_temp_up & df_temp_down
 
                 up_wins_tie = (df_statistics["prob_up"] > df_statistics["prob_down"]) | ((df_statistics["prob_up"] == df_statistics["prob_down"]) & coin)
@@ -991,8 +1003,8 @@ class AFRR(Market):
                 _perc_affr_act_up["value"] = df_statistics["act_up"] * df_statistics["prob_up"]
                 _perc_affr_act_down["value"] = df_statistics["act_down"] * df_statistics["prob_down"]
 
-        e_afrr_act_up = _perc_affr_act_up
-        e_afrr_act_down = _perc_affr_act_down
+        e_afrr_act_up = _perc_affr_act_up.fillna(0)
+        e_afrr_act_down = _perc_affr_act_down.fillna(0)
 
         return e_afrr_act_up, e_afrr_act_down
     
