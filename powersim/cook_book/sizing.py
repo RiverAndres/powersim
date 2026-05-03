@@ -1,7 +1,6 @@
 # Use case where a set of system configurations are studied to determine the optimal one.
 # The data is exported to the specified address in Excel format, by default in downloads.
 import pandas as pd
-# from ..cook_book import recipe
 from ..models.modules import System
 from ..markets.markets import DayAhead
 from ..optimizers.perfect_optimizer import PerfectOptimizer
