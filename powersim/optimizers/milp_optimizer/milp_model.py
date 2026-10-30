@@ -1,24 +1,35 @@
 import pyomo.environ as pyo
 from pyomo.opt import SolverStatus, TerminationCondition
-from ..base_optimizer import BaseOptimizer
-from ...visualization.results import SimulationResult
-from ...models.modules import System, Battery, Photovoltaic
-from ...markets.base import Market
-from ...utils.helpers import calculate_time_deltas
 import pandas as pd
 import numpy as np
 
+from ...visualization.results import SimulationResult
+from ...utils.helpers import calculate_time_deltas
 
-class PerfectOptimizer(BaseOptimizer):
+from ...assets.modules import System, Battery, Photovoltaic
+from .milp_modules import Milp_System, Milp_Battery, Milp_Photovoltaic
+from ...markets.markets import Market, DayAhead, IntraDay01, IntraDay02, IntraDay03, AFRR, MFRR
+from .milp_markets import Milp_DayAhead, Milp_IntraDay01, Milp_IntraDay02, Milp_IntraDay03, Milp_AFRR, Milp_MFRR
+from ..optimizer import Optimizer
+
+
+class PerfectOptimizer(Optimizer):
     """
     MILP approach to maximize the benefit of the system. 
     """
+    system_class = Milp_System
+    market_map = {
+        DayAhead: Milp_DayAhead,
+        IntraDay01: Milp_IntraDay01,
+        IntraDay02: Milp_IntraDay02,
+        IntraDay03: Milp_IntraDay03,
+        AFRR: Milp_AFRR,
+        MFRR: Milp_MFRR,
+    }
 
-    def __init__(self, system:System, markets:list[Market], solver_name:str = "highs", precision:int = 1):
+    def __init__(self, system:System, markets:list[Market], *, solver_name:str = "highs", precision:int = 1, **kwargs):
+        super().__init__(system, markets, **kwargs)
 
-        self.system = system
-        self.markets = markets
-        self.timestamps = next(iter(markets[0].datasets.values()))
         self.solver_name = solver_name
         self.precision = precision
 

@@ -1,18 +1,31 @@
-from .base import Market
-from ..models.modules import Battery
-from esios_request import esios_get_indicator
 import pandas as pd
 from datetime import datetime
-import pyomo.environ as pyo
 from typing import Literal
 import numpy as np
+from esios_request import esios_get_indicator
+from abc import ABC, abstractmethod
+import copy
+
+class Market(ABC):
+    def __init__(self, datasets: dict[str, object] = None):
+        self.datasets = datasets or {}
+        
+    @abstractmethod
+    def get_info(self, esios_token:str, start_date:str, end_date:str):
+        pass
+
+    @classmethod
+    def from_market(cls, other):
+        new = cls.__new__(cls)                         # sin ejecutar __init__
+        new.__dict__.update(copy.deepcopy(other.__dict__))   # name, datasets, etc.
+        return new
 
 class DayAhead(Market):
     """   
     Class that represents the day ahead market.
     """
     def __init__(self):
-        self.name = self.__class__.__name__
+        self.parent_name = self.__class__.__name__
         self.datasets: dict[str, pd.DataFrame] = {}
 
     def get_info(self, esios_token:str, start_date:str, end_date:str, use_cache = False):
@@ -42,125 +55,12 @@ class DayAhead(Market):
         
         return self
     
-    def components(self, model: pyo.ConcreteModel):
-        """
-        Adds the components (Sets, Variables, Parameters, Constraints) required to include this market in the ``model``.
-        """
-        prices = self.datasets["p_pmd"]["value"].to_dict()
-        energy = self.datasets["e_pmd"]["value"].to_dict()
-
-        # Sets
-            # NONE
-
-        # Parameters
-        model.add_component(
-            f"p_{self.name}",
-            pyo.Param(model.T, initialize = prices, within = pyo.Reals, mutable = False, default = 0)
-        )
-
-        model.add_component(
-            f"e_{self.name}",
-            pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
-        )       
-
-        # Variables
-        model.add_component(
-            f"P_buy_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-        model.add_component(
-            f"P_sell_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-
-        model.add_component(
-            f"sell_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export
-                )
-            )
-        )
-
-        model.add_component(
-            f"buy_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import
-                )
-            )
-        )
-
-        # Expressions
-        model.add_component(
-            f"Market_output_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] -
-                    getattr(model, f"P_buy_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"Power_pre_allocated_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] -
-                    getattr(model, f"P_buy_{self.name}")[t]
-                )
-            )
-        )
-        
-        model.add_component(
-            f"Revenues_{self.name}",
-            pyo.Expression(
-                expr = sum(
-                    (getattr(model, f"P_sell_{self.name}")[t] - getattr(model, f"P_buy_{self.name}")[t]) *
-                    getattr(model, f"p_{self.name}")[t] *
-                    model.dt[t]
-                    for t in model.T
-                )
-            )
-        )
-
-    def results(self, model: pyo.ConcreteModel):
-        records = []
-
-        for t in model.T:
-            records.append(
-                {
-                    "time": t,
-                    f"p_{self.name}": pyo.value(getattr(model, f"p_{self.name}")[t]),
-                    f"e_{self.name}": pyo.value(getattr(model, f"e_{self.name}")[t]),
-                    f"P_sell_{self.name}": pyo.value(getattr(model, f"P_sell_{self.name}")[t]),
-                    f"P_buy_{self.name}": pyo.value(getattr(model, f"P_buy_{self.name}")[t]),
-
-                }
-            )
-
-        df = (
-            pd.DataFrame(records)
-            .set_index("time")
-            .sort_index()
-        )
-
-        return df
-    
 class IntraDay01(Market):
     """   
     Class that represents the intra day 1 market.
     """
     def __init__(self):
-        self.name = self.__class__.__name__
+        self.parent_name = self.__class__.__name__
         self.datasets: dict[str, pd.DataFrame] = {}
 
     def get_info(self, esios_token:str, start_date:str, end_date:str, use_cache = False):
@@ -181,135 +81,12 @@ class IntraDay01(Market):
         
         return self
     
-    def components(self, model: pyo.ConcreteModel):
-        """
-        Adds the components (Sets, Variables, Parameters, Constraints) required to include this market in the ``model``.
-        """
-        prices = self.datasets["p_pmi1"]["value"].to_dict()
-        energy = self.datasets["e_pmi1"]["value"].to_dict()
-
-        # Sets
-            # NONE
-
-        # Parameters
-        model.add_component(
-            f"p_{self.name}",
-            pyo.Param(model.T, initialize = prices, within = pyo.Reals, mutable = False, default = 0)
-        )
-
-        model.add_component(
-            f"e_{self.name}",
-            pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
-        )
-
-        model.add_component(
-            f"P_buy_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-        model.add_component(
-            f"P_sell_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-        # Constraints
-        model.add_component(
-            f"output_market_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= getattr(model, f"e_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"sell_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export
-                )
-            )
-        )
-
-        model.add_component(
-            f"buy_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import
-                )
-            )
-        )
-
-        # Expressions
-        model.add_component(
-            f"Market_output_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] -
-                    getattr(model, f"P_buy_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"Power_pre_allocated_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] -
-                    getattr(model, f"P_buy_{self.name}")[t]
-                )
-            )
-        )
-        
-        model.add_component(
-            f"Revenues_{self.name}",
-            pyo.Expression(
-                expr = sum(
-                    (getattr(model, f"P_sell_{self.name}")[t] - getattr(model, f"P_buy_{self.name}")[t]) *
-                    getattr(model, f"p_{self.name}")[t] *
-                    model.dt[t]
-                    for t in model.T
-                )
-            )
-        )
-
-    def results(self, model: pyo.ConcreteModel):
-        records = []
-
-        for t in model.T:
-            records.append(
-                {
-                    "time": t,
-                    f"p_{self.name}": pyo.value(getattr(model, f"p_{self.name}")[t]),
-                    f"e_{self.name}": pyo.value(getattr(model, f"e_{self.name}")[t]),
-                    f"P_sell_{self.name}": pyo.value(getattr(model, f"P_sell_{self.name}")[t]),
-                    f"P_buy_{self.name}": pyo.value(getattr(model, f"P_buy_{self.name}")[t]),
-
-                }
-            )
-
-        df = (
-            pd.DataFrame(records)
-            .set_index("time")
-            .sort_index()
-        )
-
-        return df
-    
 class IntraDay02(Market):
     """
     Class that represents the intra day 2 market.
     """
     def __init__(self):
-        self.name = self.__class__.__name__
+        self.parent_name = self.__class__.__name__
         self.datasets: dict[str, pd.DataFrame] = {}
 
     def get_info(self, esios_token:str, start_date:str, end_date:str, use_cache = False):
@@ -330,134 +107,12 @@ class IntraDay02(Market):
         
         return self
     
-    def components(self, model: pyo.ConcreteModel):
-        """
-        Adds the components (Sets, Variables, Parameters, Constraints) required to include this market in the ``model``.
-        """
-        prices = self.datasets["p_pmi2"]["value"].to_dict()
-        energy = self.datasets["e_pmi2"]["value"].to_dict()
-        # Sets
-            # NONE
-
-        # Parameters
-        model.add_component(
-            f"p_{self.name}",
-            pyo.Param(model.T, initialize = prices, within = pyo.Reals, mutable = False, default = 0)
-        )
-
-        model.add_component(
-            f"e_{self.name}",
-            pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
-        )   
-
-        model.add_component(
-            f"P_buy_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-        model.add_component(
-            f"P_sell_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-        # Constraints
-        model.add_component(
-            f"output_market_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= getattr(model, f"e_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"sell_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export
-                )
-            )
-        )
-
-        model.add_component(
-            f"buy_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import
-                )
-            )
-        )
-
-        # Expressions
-        model.add_component(
-            f"Market_output_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] -
-                    getattr(model, f"P_buy_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"Power_pre_allocated_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] -
-                    getattr(model, f"P_buy_{self.name}")[t]
-                )
-            )
-        )
-        
-        model.add_component(
-            f"Revenues_{self.name}",
-            pyo.Expression(
-                expr = sum(
-                    (getattr(model, f"P_sell_{self.name}")[t] - getattr(model, f"P_buy_{self.name}")[t]) *
-                    getattr(model, f"p_{self.name}")[t] *
-                    model.dt[t]
-                    for t in model.T
-                )
-            )
-        )
-
-    def results(self, model: pyo.ConcreteModel):
-        records = []
-
-        for t in model.T:
-            records.append(
-                {
-                    "time": t,
-                    f"p_{self.name}": pyo.value(getattr(model, f"p_{self.name}")[t]),
-                    f"e_{self.name}": pyo.value(getattr(model, f"e_{self.name}")[t]),
-                    f"P_sell_{self.name}": pyo.value(getattr(model, f"P_sell_{self.name}")[t]),
-                    f"P_buy_{self.name}": pyo.value(getattr(model, f"P_buy_{self.name}")[t]),
-
-                }
-            )
-
-        df = (
-            pd.DataFrame(records)
-            .set_index("time")
-            .sort_index()
-        )
-
-        return df
-    
 class IntraDay03(Market):
     """
     Class that represents the intra day 2 market.
     """
     def __init__(self):
-        self.name = self.__class__.__name__
+        self.parent_name = self.__class__.__name__
         self.datasets: dict[str, pd.DataFrame] = {}
 
     def get_info(self, esios_token:str, start_date:str, end_date:str, use_cache = False):
@@ -478,128 +133,7 @@ class IntraDay03(Market):
         
         return self
 
-    def components(self, model: pyo.ConcreteModel):
-        """
-        Adds the components (Sets, Variables, Parameters, Constraints) required to include this market in the ``model``.
-        """
-        prices = self.datasets["p_pmi3"]["value"].to_dict()
-        energy = self.datasets["e_pmi3"]["value"].to_dict()
 
-        # Sets
-            # NONE
-
-        # Parameters
-        model.add_component(
-            f"p_{self.name}",
-            pyo.Param(model.T, initialize = prices, within = pyo.Reals, mutable = False, default = 0)
-        )
-
-        model.add_component(
-            f"e_{self.name}",
-            pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
-        )
-
-        model.add_component(
-            f"P_buy_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-        model.add_component(
-            f"P_sell_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-        # Constraints
-        model.add_component(
-            f"output_market_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= getattr(model, f"e_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"sell_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export
-                )
-            )
-        )
-
-        model.add_component(
-            f"buy_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import
-                )
-            )
-        )
-
-        # Expressions
-        model.add_component(
-            f"Market_output_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] -
-                    getattr(model, f"P_buy_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"Power_pre_allocated_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] -
-                    getattr(model, f"P_buy_{self.name}")[t]
-                )
-            )
-        )
-        
-        model.add_component(
-            f"Revenues_{self.name}",
-            pyo.Expression(
-                expr = sum(
-                    (getattr(model, f"P_sell_{self.name}")[t] - getattr(model, f"P_buy_{self.name}")[t]) *
-                    getattr(model, f"p_{self.name}")[t] *
-                    model.dt[t]
-                    for t in model.T
-                )
-            )
-        )
-
-    def results(self, model: pyo.ConcreteModel):
-        records = []
-
-        for t in model.T:
-            records.append(
-                {
-                    "time": t,
-                    f"p_{self.name}": pyo.value(getattr(model, f"p_{self.name}")[t]),
-                    f"e_{self.name}": pyo.value(getattr(model, f"e_{self.name}")[t]),
-                    f"P_sell_{self.name}": pyo.value(getattr(model, f"P_sell_{self.name}")[t]),
-                    f"P_buy_{self.name}": pyo.value(getattr(model, f"P_buy_{self.name}")[t]),
-
-                }
-            )
-
-        df = (
-            pd.DataFrame(records)
-            .set_index("time")
-            .sort_index()
-        )
-
-        return df
     
 class AFRR(Market):
     """
@@ -611,8 +145,8 @@ class AFRR(Market):
             max_down: float | None = None,
             act:Literal["bin_prop", "bin_max", "rand"] | None = None
             ):
-        
-        self.name = self.__class__.__name__
+
+        self.parent_name = self.__class__.__name__
         self.datasets: dict[str, pd.DataFrame] = {}
         self._act = act
         self._max_up = max_up
@@ -702,222 +236,6 @@ class AFRR(Market):
             use_cache = use_cache,
             )
         return self
-    
-    def components(self, model: pyo.ConcreteModel):
-        """
-        Adds the components (Sets, Variables, Parameters, Constraints) required to include this market in the ``model``.
-        """
-        p_afrr_up = self.datasets["p_afrr_up"]["value"].to_dict()
-        p_afrr_down = self.datasets["p_afrr_down"]["value"].to_dict()
-        p_afrr_act_up = self.datasets["p_afrr_act_up"]["value"].to_dict()
-        p_afrr_act_down = self.datasets["p_afrr_act_down"]["value"].to_dict()
-        band_afrr_up = self.datasets["band_afrr_up"]["value"].to_dict()
-        band_afrr_down = self.datasets["band_afrr_down"]["value"].to_dict()
-
-        e_afrr_act_up, e_afrr_act_down = self._energy_activation_requirements()
-        max_afrr_up = model.system_capacity_export
-        max_afrr_down = model.system_capacity_import
-
-        if self._max_up:
-            max_afrr_up = min(self._max_up, model.system_capacity_export)
-
-        if self._max_down:
-            max_afrr_down = min(self._max_down, model.system_capacity_import)
-
-        # Sets
-            # NONE
-
-        # Parameters
-        model.add_component(
-            f"p_up_{self.name}",
-            pyo.Param(model.T, initialize = p_afrr_up, within = pyo.Reals, mutable = False, default = 0)
-        )
-        model.add_component(
-            f"p_down_{self.name}",
-            pyo.Param(model.T, initialize = p_afrr_down, within = pyo.Reals, mutable = False, default = 0)
-        )
-        model.add_component(
-            f"p_act_up_{self.name}",
-            pyo.Param(model.T, initialize = p_afrr_act_up, within = pyo.Reals, mutable = False, default = 0)
-        )
-        model.add_component(
-            f"p_act_down_{self.name}",
-            pyo.Param(model.T, initialize = p_afrr_act_down, within = pyo.Reals, mutable = False, default = 0)
-        )
-        model.add_component(
-            f"band_up_{self.name}",
-            pyo.Param(model.T, initialize = band_afrr_up, within = pyo.Reals, mutable = False, default = 0)
-        )
-        model.add_component(
-            f"band_down_{self.name}",
-            pyo.Param(model.T, initialize = band_afrr_down, within = pyo.Reals, mutable = False, default = 0)
-        )
-        model.add_component(
-            f"e_act_up_{self.name}",
-            pyo.Param(model.T, initialize = e_afrr_act_up, within = pyo.Reals, mutable = False, default = 0)
-        )
-        model.add_component(
-            f"e_act_down_{self.name}",
-            pyo.Param(model.T, initialize = e_afrr_act_down, within = pyo.Reals, mutable = False, default = 0)
-        )
-        # Variables
-        model.add_component(
-            f"Band_up_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-        model.add_component(
-            f"Band_down_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-        model.add_component(
-            f"P_up_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-        model.add_component(
-            f"P_down_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-        # Constraints
-        model.add_component(
-            f"band_up_market_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"Band_up_{self.name}")[t]
-                    <= getattr(model, f"band_up_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"band_down_market_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"Band_down_{self.name}")[t]
-                    <= getattr(model, f"band_down_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"band_up_system_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(m, f"Band_up_{self.name}")[t]
-                    <= max_afrr_up
-                )
-            )
-        )
-
-        model.add_component(
-            f"band_down_system_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(m, f"Band_down_{self.name}")[t]
-                    <= max_afrr_down
-                )
-            )
-        )
-
-        model.add_component(
-            f"act_up_requirement_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(m, f"P_up_{self.name}")[t] # Var
-                    == 
-                    getattr(m, f"e_act_up_{self.name}")[t] * # Param from 0 to 1
-                    getattr(m, f"Band_up_{self.name}")[t] # Var ofered act band
-                )
-            )
-        )
-
-        model.add_component(
-            f"act_down_requirement_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(m, f"P_down_{self.name}")[t]
-                    == 
-                    getattr(m, f"e_act_down_{self.name}")[t] *
-                    getattr(m, f"Band_up_{self.name}")[t]
-                )
-            )
-        )
-
-        # Expressions
-        model.add_component(
-            f"Market_output_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(m, f"P_up_{self.name}")[t] -
-                    getattr(m, f"P_down_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"Power_pre_allocated_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    0
-                )
-            )
-        )
-        
-        model.add_component(
-            f"Revenues_{self.name}",
-            pyo.Expression(
-                expr = sum(
-                    (getattr(model, f"Band_up_{self.name}")[t] * getattr(model, f"p_up_{self.name}")[t]) +
-                    (getattr(model, f"Band_down_{self.name}")[t] * getattr(model, f"p_down_{self.name}")[t]) +
-                    (
-                        (getattr(model, f"P_up_{self.name}")[t] * getattr(model, f"p_act_up_{self.name}")[t]) +
-                        (- getattr(model, f"P_down_{self.name}")[t] * getattr(model, f"p_act_down_{self.name}")[t])
-                    ) * 
-                    model.dt[t]
-                    for t in model.T
-                )
-            )
-        )
-
-    def results(self, model: pyo.ConcreteModel):
-        records = []
-
-        for t in model.T:
-            records.append(
-                {
-                    "time": t,
-                    f"p_up_{self.name}": pyo.value(getattr(model, f"p_up_{self.name}")[t]),
-                    f"p_down_{self.name}": pyo.value(getattr(model, f"p_down_{self.name}")[t]),
-                    f"p_act_up_{self.name}": pyo.value(getattr(model, f"p_act_up_{self.name}")[t]),
-                    f"p_act_down_{self.name}": pyo.value(getattr(model, f"p_act_down_{self.name}")[t]),
-                    f"band_up_{self.name}": pyo.value(getattr(model, f"band_up_{self.name}")[t]),
-                    f"band_down_{self.name}": pyo.value(getattr(model, f"band_down_{self.name}")[t]),
-                    f"e_act_up_{self.name}": pyo.value(getattr(model, f"e_act_up_{self.name}")[t]),
-                    f"e_act_down_{self.name}": pyo.value(getattr(model, f"e_act_down_{self.name}")[t]),
-                    f"Band_up_{self.name}": pyo.value(getattr(model, f"Band_up_{self.name}")[t]),
-                    f"Band_down_{self.name}": pyo.value(getattr(model, f"Band_down_{self.name}")[t]),
-                    f"P_up_{self.name}": pyo.value(getattr(model, f"P_up_{self.name}")[t]),
-                    f"P_down_{self.name}": pyo.value(getattr(model, f"P_down_{self.name}")[t]),
-                }
-            )
-
-        df = (
-            pd.DataFrame(records)
-            .set_index("time")
-            .sort_index()
-        )
-
-        return df
 
     def _energy_activation_requirements(self) -> tuple[dict, dict]:
         """
@@ -1013,7 +331,7 @@ class MFRR(Market):
     Class that represents the mFRR market.
     """
     def __init__(self):
-        self.name = self.__class__.__name__
+        self.parent_name = self.__class__.__name__
         self.datasets: dict[str, pd.DataFrame] = {}
 
     def get_info(self, esios_token:str, start_date:str, end_date:str, use_cache = False):
@@ -1025,121 +343,6 @@ class MFRR(Market):
             use_cache = use_cache
             )
         return self
-
-    def components(self, model: pyo.ConcreteModel):
-        """
-        Adds the components (Sets, Variables, Parameters, Constraints) required to include this market in the ``model``.
-        """
-        prices = self.datasets["p_pmd"]["value"].to_dict()
-        energy = self.datasets["e_pmd"]["value"].to_dict()
-
-        # Sets
-            # NONE
-
-        # Parameters
-        model.add_component(
-            f"p_{self.name}",
-            pyo.Param(model.T, initialize = prices, within = pyo.Reals, mutable = False, default = 0)
-        )
-
-        model.add_component(
-            f"e_{self.name}",
-            pyo.Param(model.T, initialize = energy, within = pyo.Reals, mutable = False, default = 0)
-        )       
-        # Variables
-        model.add_component(
-            f"bin_{self.name}",
-            pyo.Var(model.T, domain = pyo.Binary)
-        )
-
-        model.add_component(
-            f"P_buy_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-
-        model.add_component(
-            f"P_sell_{self.name}",
-            pyo.Var(model.T, domain = pyo.NonNegativeReals)
-        )
-        # Constraints
-        model.add_component(
-            f"output_market_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t] +
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= getattr(model, f"e_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"sell_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_sell_{self.name}")[t]
-                    <= m.system_capacity_export * getattr(model, f"bin_{self.name}")[t]
-                )
-            )
-        )
-
-        model.add_component(
-            f"buy_mode_limit_{self.name}",
-            pyo.Constraint(
-                model.T,
-                rule = lambda m, t: (
-                    getattr(model, f"P_buy_{self.name}")[t]
-                    <= m.system_capacity_import * (1 - getattr(model, f"bin_{self.name}")[t])
-                )
-            )
-        )
-
-        # Expressions
-        model.add_component(
-            f"Power_pre_allocated_{self.name}",
-            pyo.Expression(
-                model.T,
-                rule = lambda m, t: (
-                    0
-                )
-            )
-        )
-        
-        model.add_component(
-            f"Revenues_{self.name}",
-            pyo.Expression(
-                expr = sum(
-                    (getattr(model, f"P_sell_{self.name}")[t] - getattr(model, f"P_buy_{self.name}")[t]) *
-                    getattr(model, f"p_{self.name}")[t] *
-                    model.dt[t]
-                    for t in model.T
-                )
-            )
-        )
-
-    def results(self, model: pyo.ConcreteModel):
-        records = []
-
-        for t in model.T:
-            records.append(
-                {
-                    "time": t,
-                    f"p_{self.name}": pyo.value(getattr(model, f"p_{self.name}")[t]),
-                    f"P_sell_{self.name}": pyo.value(getattr(model, f"P_sell_{self.name}")[t]),
-                    f"P_buy_{self.name}": pyo.value(getattr(model, f"P_buy_{self.name}")[t]),
-
-                }
-            )
-
-        df = (
-            pd.DataFrame(records)
-            .set_index("time")
-            .sort_index()
-        )
-
-        return df
 
 # class RRTT(Market):
     # """

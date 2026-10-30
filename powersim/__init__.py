@@ -1,5 +1,5 @@
 from .markets import DayAhead, IntraDay01, IntraDay02, IntraDay03, AFRR, MFRR
-from .models import System, Photovoltaic, Battery
+from .assets import System, Photovoltaic, Battery
 from .optimizers import PerfectOptimizer
 from .cook_book import CookBook
 

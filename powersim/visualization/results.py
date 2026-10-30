@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import pyomo.environ as pyo
 
-from ..models.modules import System, Battery, Photovoltaic
-from ..markets.base import Market
+from ..assets.modules import System, Battery, Photovoltaic
+from ..markets.markets import Market
 
 class SimulationResult:
     """
@@ -60,7 +60,7 @@ class SimulationResult:
         self.operation_market = pd.DataFrame(index = self.operation_system.index)
 
         for market in self.markets:
-            name = market.__class__.__name__
+            name = market.parent_name
             operation_single_market = market.results(self.simulation)
 
             if name == "AFRR":
@@ -122,7 +122,7 @@ class SimulationResult:
             self.operation_timeseries[f"RSOC_{storage_name}"] = self.operation_storage[f"RSOC_{storage_name}"]
 
         for market in self.markets:
-            name = market.__class__.__name__
+            name = market.parent_name
 
             if name == "AFRR":
                 self.operation_timeseries[f"p_up_{name}"] = self.operation_market[f"p_up_{name}"]
@@ -240,7 +240,7 @@ class SimulationResult:
         colors_area_plots = []
         
         for market in self.markets:
-            name = market.__class__.__name__
+            name = market.parent_name
 
 
             if name == "AFRR":
