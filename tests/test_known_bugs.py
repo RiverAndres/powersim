@@ -51,6 +51,16 @@ def test_min_resting_period_spans_several_periods():
     assert len(rest_vars) == 3
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="PerfectOptimizer forwards **kwargs to Optimizer.__init__, which does not accept them",
+)
+def test_unknown_optimizer_argument_gives_clear_error():
+    system = System(capacity_buy=10, capacity_sell=10, efficiency=1.0)
+    with pytest.raises(TypeError, match="PerfectOptimizer"):
+        PerfectOptimizer(system, [make_day_ahead([50] * 4)], unknown_option=1)
+
+
 @pytest.mark.xfail(strict=True, reason="Milp_MFRR is incomplete (no Market_output expression)")
 def test_mfrr_can_be_optimized():
     market = MFRR()
