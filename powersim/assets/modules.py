@@ -9,6 +9,7 @@ from calendar import isleap, monthrange
 
 from ..utils.cache import df_cache
 
+
 class Module:
     """
     Base module, all the common properties in modules are located here.
@@ -20,7 +21,7 @@ class Module:
         new.__dict__.update(copy.deepcopy(other.__dict__))
         return new
 
-    
+
 class Photovoltaic(Module):
     """
     Photovoltaic power plant.
@@ -44,6 +45,7 @@ class Photovoltaic(Module):
         * self.ehpp
 
     """
+
     def __init__(
         self,
         peak_power: float | None = None,
@@ -53,16 +55,10 @@ class Photovoltaic(Module):
         tilt: float | None = None,
         azimuth: float = 180,
         losses: float = 0.85,
-        name: str | None = None
+        name: str | None = None,
     ):
-        if not (
-            (peak_power == None)*
-            (latitude == None)*
-            (longitude == None)+
-            (name == None)
-            ):
+        if not ((peak_power == None) * (latitude == None) * (longitude == None) + (name == None)):
             raise NameError("peak_power, latitude, longitude cannont be None if name is also None")
-        
 
         self.peak_power = peak_power
         self.latitude = latitude
@@ -71,22 +67,28 @@ class Photovoltaic(Module):
         self.tilt = tilt if tilt is not None else latitude
         self.azimuth = azimuth
         self.losses = losses
-        self.name = name or f"PV{str(self.peak_power)}LAT{str(self.latitude)}LON{str(self.longitude)}"
+        self.name = (
+            name or f"PV{str(self.peak_power)}LAT{str(self.latitude)}LON{str(self.longitude)}"
+        )
 
         self.production = None
-
 
     def __str__(self):
         return f"""\
 Photovoltaic; Name {self.name} ; Peak power {self.peak_power} MWp ; Lat {self.latitude}º ; Lon {self.longitude}º ; Tracker {self.tracker} ; Tilt {self.tilt} ; Azimuth {self.azimuth:.2f} ; Losses {self.losses:.2f}\
 """
-    
+
     def __repr__(self):
         return f"""\
 Photovoltaic(name={self.name}, peak_power={self.peak_power}, latitude={self.latitude}, longitude={self.longitude}, tracker={self.tracker}, tilt={self.tilt}, azimuth={self.azimuth}, losses={self.losses})\
 """
-    
-    def get_production(self, percentile: int | None = 50, start_date: str | None = "2001/01/01T00:00:00Z", end_date: str | None = "2001/12/31T23:59:00Z"):
+
+    def get_production(
+        self,
+        percentile: int | None = 50,
+        start_date: str | None = "2001/01/01T00:00:00Z",
+        end_date: str | None = "2001/12/31T23:59:00Z",
+    ):
         """
         Obtain a full year of power production of the generation module.
 
@@ -98,28 +100,35 @@ Photovoltaic(name={self.name}, peak_power={self.peak_power}, latitude={self.lati
             it is usually accompanied by the letter “P” followed by the cumulative probability. Below is an
             example showing both conventions. On the left is the one that should be used in this method.
 
-            * ``percentile`` = 10 ; is equivalent to ; P90 
+            * ``percentile`` = 10 ; is equivalent to ; P90
             * ``percentile`` = 50 ; is equivalent to ; P50
             * ``percentile`` = 90 ; is equivalent to ; P10
 
         :type percentile: Literal[str, bool]
-        
-    
+
+
         Returns
         ----------
 
         self
         """
 
-        production_one_year = self._calculate_percentile_production(percentile = percentile)
-        self.production = self._rearrange_production_to_dates(production_one_year = production_one_year, start_date = start_date, end_date = end_date)
+        production_one_year = self._calculate_percentile_production(percentile=percentile)
+        self.production = self._rearrange_production_to_dates(
+            production_one_year=production_one_year, start_date=start_date, end_date=end_date
+        )
 
         return self
 
-    def set_production(self , production_one_year, start_date: str | None = "2001/01/01T00:00:00Z", end_date: str | None = "2001/12/31T23:59:00Z"):
+    def set_production(
+        self,
+        production_one_year,
+        start_date: str | None = "2001/01/01T00:00:00Z",
+        end_date: str | None = "2001/12/31T23:59:00Z",
+    ):
         """
         Set the production between start_date and end_date by providing a full year of the production.
-        
+
         :param production_one_year: Production of one full year
         :type production_one_year:
         :param start_date: Start date of the output.
@@ -128,7 +137,9 @@ Photovoltaic(name={self.name}, peak_power={self.peak_power}, latitude={self.lati
         :type end_date: str | None
         """
 
-        self.production = self._rearrange_production_to_dates(production_one_year = production_one_year, start_date = start_date, end_date = end_date)
+        self.production = self._rearrange_production_to_dates(
+            production_one_year=production_one_year, start_date=start_date, end_date=end_date
+        )
 
         return self
 
@@ -139,21 +150,22 @@ Photovoltaic(name={self.name}, peak_power={self.peak_power}, latitude={self.lati
         """
 
         meteo, meta = pvlib.iotools.get_pvgis_hourly(
-            latitude = self.latitude,
-            longitude = self.longitude,
-            start = 2019,
-            end = 2023,
-            raddatabase = "PVGIS-SARAH3",
+            latitude=self.latitude,
+            longitude=self.longitude,
+            start=2019,
+            end=2023,
+            raddatabase="PVGIS-SARAH3",
             components=True,
             surface_tilt=self.latitude,
-            surface_azimuth = self.azimuth,
+            surface_azimuth=self.azimuth,
             usehorizon=True,
-            outputformat="json"
+            outputformat="json",
         )
 
         meteo["power"] = (
             self.peak_power
-            * (meteo["poa_direct"] + meteo["poa_sky_diffuse"] + meteo["poa_ground_diffuse"]) / 1000
+            * (meteo["poa_direct"] + meteo["poa_sky_diffuse"] + meteo["poa_ground_diffuse"])
+            / 1000
             * self.losses
         ).clip(lower=0)
 
@@ -162,8 +174,7 @@ Photovoltaic(name={self.name}, peak_power={self.peak_power}, latitude={self.lati
         meteo["hour"] = meteo.index.hour
 
         pxx = (
-            meteo
-            .groupby(["month", "day", "hour"])["power"]
+            meteo.groupby(["month", "day", "hour"])["power"]
             .quantile(percentile / 100)
             .reset_index()
         )
@@ -176,20 +187,15 @@ Photovoltaic(name={self.name}, peak_power={self.peak_power}, latitude={self.lati
                     "day": pxx["day"].astype(int),
                     "hour": pxx["hour"].astype(int),
                 },
-                utc=True
+                utc=True,
             )
         )
 
-        df = pd.DataFrame(
-            {
-                "power": pxx["power"].to_numpy()
-            },
-            index=index
-        ).sort_index()
+        df = pd.DataFrame({"power": pxx["power"].to_numpy()}, index=index).sort_index()
 
         return df
-    
-    def _calculate_production(self, start:int, end:int ) -> pd.DataFrame:
+
+    def _calculate_production(self, start: int, end: int) -> pd.DataFrame:
         """
         Power output (MW) of the given year.
 
@@ -199,32 +205,35 @@ Photovoltaic(name={self.name}, peak_power={self.peak_power}, latitude={self.lati
         """
 
         meteo, meta = pvlib.iotools.get_pvgis_hourly(
-            latitude = self.latitude,
-            longitude = self.longitude,
-            start = start,
-            end = end,
-            raddatabase = "PVGIS-SARAH3",
-            components = True,
-            surface_tilt = self.latitude,
-            surface_azimuth = self.azimuth,
-            usehorizon = True,
-            outputformat = "json"
+            latitude=self.latitude,
+            longitude=self.longitude,
+            start=start,
+            end=end,
+            raddatabase="PVGIS-SARAH3",
+            components=True,
+            surface_tilt=self.latitude,
+            surface_azimuth=self.azimuth,
+            usehorizon=True,
+            outputformat="json",
         )
 
         meteo["power_mw"] = (
             self.peak_power
-            * (meteo["poa_direct"] + meteo["poa_sky_diffuse"] + meteo["poa_ground_diffuse"]) / 1000
+            * (meteo["poa_direct"] + meteo["poa_sky_diffuse"] + meteo["poa_ground_diffuse"])
+            / 1000
             * self.losses
         ).clip(lower=0)
-        
+
         df = meteo[["power_mw"]]
 
         return df
-    
-    def _rearrange_production_to_dates(self, production_one_year:pd.DataFrame, start_date:str, end_date:str) -> pd.DataFrame:
+
+    def _rearrange_production_to_dates(
+        self, production_one_year: pd.DataFrame, start_date: str, end_date: str
+    ) -> pd.DataFrame:
         """
         Rearrange the production dates into the provided ones. The output production will be the same every year.
-        
+
         :param production: pd.DataFrame with the power production. It must have only one column.
         :type production: pd.DataFrame
         :param start_date: Initial date of the required output power production.
@@ -238,26 +247,27 @@ Photovoltaic(name={self.name}, peak_power={self.peak_power}, latitude={self.lati
         production_one_year["dates_key"] = production_one_year.index.strftime("%m/%dT%H:%M:%SZ")
         mapping = production_one_year.set_index("dates_key")
 
-        req_dates_index = pd.date_range(start = start_date, end = end_date, freq = "1h")
-        production_req_dates = pd.DataFrame(index = req_dates_index)
+        req_dates_index = pd.date_range(start=start_date, end=end_date, freq="1h")
+        production_req_dates = pd.DataFrame(index=req_dates_index)
         production_req_dates["dates_key"] = production_req_dates.index.strftime("%m/%dT%H:%M:%SZ")
-        
-        production_req_dates = production_req_dates.join(mapping, on = "dates_key")
-        production_req_dates = production_req_dates.drop(columns = "dates_key")
+
+        production_req_dates = production_req_dates.join(mapping, on="dates_key")
+        production_req_dates = production_req_dates.drop(columns="dates_key")
 
         return production_req_dates
-    
+
     def power_at(self, t):
         return float(self.production.loc[t, "power"])
 
+
 class Battery(Module):
-    """   
-    Class that represents a standalone - battery. 
-    
+    """
+    Class that represents a standalone - battery.
+
     :vartype capacity: float
     :var capacity: Total amount of energy that can be storaged in the battery in MWh.
     :vartype rte: float
-    :var rte: Roundtrip efficiency (both charge and discharge). 
+    :var rte: Roundtrip efficiency (both charge and discharge).
     :vartype c_rate: float
     :var c_rate: Inverse of hours of storage: max power output (of the battery, not the interconnection capacity) over capacity.
     :vartype dod: float = 1
@@ -282,20 +292,20 @@ class Battery(Module):
     """
 
     def __init__(
-            self,
-            capacity:float,
-            rte:float,
-            c_rate:float,
-            dod:float = 1,
-            soc_max:float = 1,
-            soc_initial:float = 0,
-            max_cycles_day:float | None = None,
-            max_cycles_day_monthly_avg:float | None = None,
-            max_cycles_day_yearly_avg:float | None = None,
-            rsoc: tuple[int | None, int | None, Literal["monthly", "yearly"] | None] | None = None,
-            resting_period: int | None = None,
-            min_power_output: float | None = 0.1,
-            name:str | None = None
+        self,
+        capacity: float,
+        rte: float,
+        c_rate: float,
+        dod: float = 1,
+        soc_max: float = 1,
+        soc_initial: float = 0,
+        max_cycles_day: float | None = None,
+        max_cycles_day_monthly_avg: float | None = None,
+        max_cycles_day_yearly_avg: float | None = None,
+        rsoc: tuple[int | None, int | None, Literal["monthly", "yearly"] | None] | None = None,
+        resting_period: int | None = None,
+        min_power_output: float | None = 0.1,
+        name: str | None = None,
     ):
         self.capacity = capacity
         self.rte = rte
@@ -319,19 +329,20 @@ class Battery(Module):
         return f"""\
 Battery; Name {self.name} ; Capacity {self.capacity:.2f} MW ; RTE {self.rte:.2f} ; C_rate {self.c_rate:.2f} 1/h ; DOD {self.dod:.2f} ; SOC_max {self.soc_max:.2f} ; SOC_initial {self.soc_initial:.2f} ; Max cycles per day {self.max_cycles_day} cycles ; Max cycles per day monthly average {self.max_cycles_day_monthly_avg} ; Max cycles per day yearly average {self.max_cycles_day_yearly_avg} cycles ; RSOC {self.rsoc} ; Resting period {self.resting_period} h\
 """
-    
+
     def __repr__(self):
         return f"""\
 Battery(name={self.name}, capacity={self.capacity}, rte={self.rte}, c_rate={self.c_rate}, dod={self.dod}, soc_max={self.soc_max}, soc_initial={self.soc_initial}, max_cycles_day={self.max_cycles_day}, max_cycles_day_monthly_avg={self.max_cycles_day_monthly_avg}, max_cycles_day_yearly_avg={self.max_cycles_day_yearly_avg}, max_power_output={self.max_power_output}, min_power_output={self.min_power_output}, rsoc={self.rsoc}, resting_period={self.resting_period})\
 """
 
-class System():
+
+class System:
     """
     Module container. All modules in the system are connected via
     a single module, which in turn connects to the grid; the system's
-    import and export power values are limited by capacity_buy and 
-    capacity_sell. 
-    
+    import and export power values are limited by capacity_buy and
+    capacity_sell.
+
     :var modules: Description
     :vartype modules: float
     :var efficiency: Description
@@ -357,14 +368,14 @@ class System():
         self.generators = []
 
     def __str__(self):
-        
+
         batteries_str = ""
         generators_str = ""
 
         for battery in self.batteries:
-            batteries_str +=f"{battery}"
+            batteries_str += f"{battery}"
         for generator in self.generators:
-            generators_str +=f"{generator}"
+            generators_str += f"{generator}"
 
         return f"""\
 System; Access capacity buy{self.capacity_buy:.2f} MW ; Access capacity sell {self.capacity_sell:.2f} MW ; Efficiency {self.efficiency:.2f}
@@ -372,16 +383,16 @@ Modules:
 {generators_str}
 {batteries_str}\
 """
-    
+
     def __repr__(self):
-                
+
         batteries_repr = "["
         generators_repr = "["
 
         for battery in self.batteries:
-            batteries_repr +=f"{repr(battery)},"
+            batteries_repr += f"{repr(battery)},"
         for generator in self.generators:
-            generators_repr +=f"{repr(generator)},"
+            generators_repr += f"{repr(generator)},"
 
         batteries_repr += "]"
         generators_repr += "]"
@@ -390,11 +401,11 @@ Modules:
 System(capacity_buy={self.capacity_buy}, capacity_sell={self.capacity_sell}, efficiency={self.efficiency})
 Modules=[{batteries_repr}, {generators_repr}]\
 """
-    
+
     def add_module(self, module):
         """
         Add a generation/storage module to the system.
-        
+
         :param module: Description
         """
         match module:
@@ -416,10 +427,10 @@ Modules=[{batteries_repr}, {generators_repr}]\
         for module in other.batteries + other.generators:
             new.add_module(cls._migrate_module(module))
         return new
- 
+
     @classmethod
     def _migrate_module(cls, module):
         for parent_cls, child_cls in cls.module_map.items():
             if isinstance(module, parent_cls):
                 return child_cls.from_module(module)
-        return copy.deepcopy(module) 
+        return copy.deepcopy(module)

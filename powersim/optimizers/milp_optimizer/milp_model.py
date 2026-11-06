@@ -9,14 +9,22 @@ from ...utils.helpers import calculate_time_deltas
 from ...assets.modules import System, Battery, Photovoltaic
 from .milp_modules import Milp_System, Milp_Battery, Milp_Photovoltaic
 from ...markets.markets import Market, DayAhead, IntraDay01, IntraDay02, IntraDay03, AFRR, MFRR
-from .milp_markets import Milp_DayAhead, Milp_IntraDay01, Milp_IntraDay02, Milp_IntraDay03, Milp_AFRR, Milp_MFRR
+from .milp_markets import (
+    Milp_DayAhead,
+    Milp_IntraDay01,
+    Milp_IntraDay02,
+    Milp_IntraDay03,
+    Milp_AFRR,
+    Milp_MFRR,
+)
 from ..optimizer import Optimizer
 
 
 class PerfectOptimizer(Optimizer):
     """
-    MILP approach to maximize the benefit of the system. 
+    MILP approach to maximize the benefit of the system.
     """
+
     system_class = Milp_System
     market_map = {
         DayAhead: Milp_DayAhead,
@@ -27,7 +35,15 @@ class PerfectOptimizer(Optimizer):
         MFRR: Milp_MFRR,
     }
 
-    def __init__(self, system:System, markets:list[Market], *, solver_name:str = "highs", precision:int = 1, **kwargs):
+    def __init__(
+        self,
+        system: System,
+        markets: list[Market],
+        *,
+        solver_name: str = "highs",
+        precision: int = 1,
+        **kwargs,
+    ):
         super().__init__(system, markets, **kwargs)
 
         self.solver_name = solver_name
@@ -37,17 +53,17 @@ class PerfectOptimizer(Optimizer):
         self.results = None
 
     def _model_setup(self) -> pyo.ConcreteModel:
-        
+
         time_index = self.timestamps.index.tolist()
         time_duration = calculate_time_deltas(time_index)
 
         day_index = sorted({t.date() for t in time_index})
-        month_index = sorted({t.year*100 + t.month for t in time_index})
+        month_index = sorted({t.year * 100 + t.month for t in time_index})
         year_index = sorted({t.year for t in time_index})
 
         for g in self.system.generators:
-            g.production = g.production.reindex(time_index, method = "ffill")
-            
+            g.production = g.production.reindex(time_index, method="ffill")
+
         if len(self.system.batteries) == 0:
             self.system.capacity_buy = 0
 
@@ -55,70 +71,66 @@ class PerfectOptimizer(Optimizer):
         self.model = pyo.ConcreteModel()
 
         # SETS
-        self.model.T = pyo.Set(initialize = time_index, ordered = True)
+        self.model.T = pyo.Set(initialize=time_index, ordered=True)
 
-        self.model.D = pyo.Set(initialize = day_index, ordered = True)
-        self.model.M = pyo.Set(initialize = month_index, ordered = True)
-        self.model.Y = pyo.Set(initialize = year_index, ordered = True)
+        self.model.D = pyo.Set(initialize=day_index, ordered=True)
+        self.model.M = pyo.Set(initialize=month_index, ordered=True)
+        self.model.Y = pyo.Set(initialize=year_index, ordered=True)
 
         battery_names = [b.name for b in self.system.batteries]
-        self.model.B = pyo.Set(initialize = battery_names)
+        self.model.B = pyo.Set(initialize=battery_names)
 
         # PARAMETERS
         self.model.system_capacity_export = pyo.Param(
-            initialize = self.system.capacity_sell,
-            within = pyo.NonNegativeReals
+            initialize=self.system.capacity_sell, within=pyo.NonNegativeReals
         )
 
         self.model.system_capacity_import = pyo.Param(
-            initialize = self.system.capacity_buy,
-            within = pyo.NonNegativeReals
+            initialize=self.system.capacity_buy, within=pyo.NonNegativeReals
         )
 
         self.model.dt = pyo.Param(
             self.model.T,
-            initialize = time_duration,
-            within = pyo.PositiveReals,
-            mutable = False,
+            initialize=time_duration,
+            within=pyo.PositiveReals,
+            mutable=False,
         )
 
         self.model.day_of_t = pyo.Param(
-            self.model.T,
-            initialize = {t: t.date() for t in time_index},
-            within = self.model.D
+            self.model.T, initialize={t: t.date() for t in time_index}, within=self.model.D
         )
 
         self.model.month_of_t = pyo.Param(
             self.model.T,
-            initialize = {t: t.year*100 + t.month for t in time_index},
-            within= self.model.M
+            initialize={t: t.year * 100 + t.month for t in time_index},
+            within=self.model.M,
         )
 
         self.model.year_of_t = pyo.Param(
-            self.model.T,
-            initialize = {t: t.year for t in time_index},
-            within = self.model.Y
+            self.model.T, initialize={t: t.year for t in time_index}, within=self.model.Y
         )
 
         # VARIABLES
-            ## MARKET VARIABLES 
-                # NONE
+        ## MARKET VARIABLES
+        # NONE
 
-            ## SYSTEM VARIABLES
+        ## SYSTEM VARIABLES
         # self.model.bin_system = pyo.Var(self.model.T, domain = pyo.Binary)
-        self.model.P_import = pyo.Var(self.model.T, domain = pyo.NonNegativeReals, initialize = 0)
-        self.model.P_export = pyo.Var(self.model.T, domain = pyo.NonNegativeReals, initialize = 0)
-        self.model.P_excess = pyo.Var(self.model.T, domain = pyo.NonNegativeReals, initialize = 0)
+        self.model.P_import = pyo.Var(self.model.T, domain=pyo.NonNegativeReals, initialize=0)
+        self.model.P_export = pyo.Var(self.model.T, domain=pyo.NonNegativeReals, initialize=0)
+        self.model.P_excess = pyo.Var(self.model.T, domain=pyo.NonNegativeReals, initialize=0)
 
-            ## BATTERY VARIABLES
-        self.model.P_charge = pyo.Var(self.model.B, self.model.T, domain = pyo.NonNegativeReals)
-        self.model.P_discharge = pyo.Var(self.model.B, self.model.T, domain = pyo.NonNegativeReals)
-        self.model.SOC = pyo.Var(self.model.B, self.model.T, domain = pyo.NonNegativeReals)
-        self.model.cycles = pyo.Var(self.model.B, self.model.T, within = pyo.NonNegativeReals)
-        self.model.charge = pyo.Var(self.model.B, self.model.T, within = pyo.Binary, initialize = 0)
-        self.model.discharge = pyo.Var(self.model.B, self.model.T, within = pyo.Binary, initialize = 0)
-        self.model.rest = pyo.Var(self.model.B, self.model.T, within = pyo.Binary, initialize = 0)
-        self.model.RSOC = pyo.Var(self.model.B, self.model.T, within = pyo.NonNegativeReals, initialize = 0)
+        ## BATTERY VARIABLES
+        self.model.P_charge = pyo.Var(self.model.B, self.model.T, domain=pyo.NonNegativeReals)
+        self.model.P_discharge = pyo.Var(self.model.B, self.model.T, domain=pyo.NonNegativeReals)
+        self.model.SOC = pyo.Var(self.model.B, self.model.T, domain=pyo.NonNegativeReals)
+        self.model.cycles = pyo.Var(self.model.B, self.model.T, within=pyo.NonNegativeReals)
+        self.model.charge = pyo.Var(self.model.B, self.model.T, within=pyo.Binary, initialize=0)
+        self.model.discharge = pyo.Var(self.model.B, self.model.T, within=pyo.Binary, initialize=0)
+        self.model.rest = pyo.Var(self.model.B, self.model.T, within=pyo.Binary, initialize=0)
+        self.model.RSOC = pyo.Var(
+            self.model.B, self.model.T, within=pyo.NonNegativeReals, initialize=0
+        )
 
         # EXTERNAL COMPONENTS
         for battery in self.system.batteries:
@@ -129,109 +141,64 @@ class PerfectOptimizer(Optimizer):
 
         # EXPRESSIONS
         def total_power_pre_allocated(m, t):
-            return (
-                sum(
-                    getattr(m, f"Power_pre_allocated_{market.__class__.__name__}")[t]
-                    for market in self.markets
-                )
+            return sum(
+                getattr(m, f"Power_pre_allocated_{market.__class__.__name__}")[t]
+                for market in self.markets
             )
-        
+
         self.model.add_component(
             f"Total_power_pre_allocated",
-            pyo.Expression(
-                self.model.T, rule = total_power_pre_allocated
-            )
+            pyo.Expression(self.model.T, rule=total_power_pre_allocated),
         )
 
         # SYSTEM CONSTRAINTS
-            ## Balance between modules and system
+        ## Balance between modules and system
         def system_balance_rule(m, t):
-            generation = sum(
-                (g.power_at(t) for g in self.system.generators),
-                0
-            )
+            generation = sum((g.power_at(t) for g in self.system.generators), 0)
 
-            discharge = sum(
-                (m.P_discharge[b, t] for b in m.B),
-                0
-            )
+            discharge = sum((m.P_discharge[b, t] for b in m.B), 0)
 
-            charge = sum(
-                (m.P_charge[b, t] for b in m.B),
-                0
-            )
+            charge = sum((m.P_charge[b, t] for b in m.B), 0)
 
             if len(self.system.batteries) == 0:
-                return (
-                generation
-                == m.P_export[t]
-                + m.P_excess[t]
-                )
+                return generation == m.P_export[t] + m.P_excess[t]
 
-            return (
-                m.P_import[t]
-                + generation
-                + discharge
-                == m.P_export[t]
-                + charge
-                + m.P_excess[t]
-            )
+            return m.P_import[t] + generation + discharge == m.P_export[t] + charge + m.P_excess[t]
 
-        self.model.system_balance = pyo.Constraint(
-            self.model.T, rule = system_balance_rule
-        )
+        self.model.system_balance = pyo.Constraint(self.model.T, rule=system_balance_rule)
 
         self.model.export_limit = pyo.Constraint(
-            self.model.T,
-            rule = lambda m, t: (m.P_export[t]
-                <= m.system_capacity_export
-            )
+            self.model.T, rule=lambda m, t: m.P_export[t] <= m.system_capacity_export
         )
 
         self.model.import_limit = pyo.Constraint(
-            self.model.T,
-            rule = lambda m, t: (m.P_import[t]
-                <= m.system_capacity_import
-            )
+            self.model.T, rule=lambda m, t: m.P_import[t] <= m.system_capacity_import
         )
 
         def excess_power_rule(m, t):
-            generation = sum(
-                g.power_at(t) for g in self.system.generators
-            )
+            generation = sum(g.power_at(t) for g in self.system.generators)
 
             if generation > m.system_capacity_export:
-                return (
-                    m.P_excess[t]
-                    <= generation 
-                    - self.model.system_capacity_export
-                )
-            return (
-                m.P_excess[t]
-                == 0
-            )
-        
-        self.model.excess_power = pyo.Constraint(
-            self.model.T, rule = excess_power_rule
-        )
+                return m.P_excess[t] <= generation - self.model.system_capacity_export
+            return m.P_excess[t] == 0
+
+        self.model.excess_power = pyo.Constraint(self.model.T, rule=excess_power_rule)
 
         # MARKET GLOBAL CONSTRAINTS
-            ## Balace between markets and output power
+        ## Balace between markets and output power
 
         def market_sell_limit(m, t):
             return (
                 sum(
                     getattr(m, f"Market_output_{market.__class__.__name__}")[t]
                     for market in self.markets
-                ) == m.P_export[t] * self.system.efficiency - m.P_import[t]
+                )
+                == m.P_export[t] * self.system.efficiency - m.P_import[t]
             )
-        
-        self.model.market_sell_limit = pyo.Constraint(
-            self.model.T,
-            rule = market_sell_limit
-        )
 
-            ## Limitation in Band_up and Band_down
+        self.model.market_sell_limit = pyo.Constraint(self.model.T, rule=market_sell_limit)
+
+        ## Limitation in Band_up and Band_down
         # Markets are already converted to their Milp_* classes: check the domain class.
         for market in self.markets:
             if isinstance(market, AFRR):
@@ -258,7 +225,7 @@ class PerfectOptimizer(Optimizer):
                 #         self.model.T, rule = import_mode
                 #     )
                 # )
-                
+
         return self.model
 
     def _add_afrr_band_limits(self, name: str) -> None:
@@ -281,23 +248,23 @@ class PerfectOptimizer(Optimizer):
 
         self.model.add_component(
             f"band_up_operational_limit_{name}",
-            pyo.Constraint(self.model.T, rule = band_up_limit),
+            pyo.Constraint(self.model.T, rule=band_up_limit),
         )
         self.model.add_component(
             f"band_down_operational_limit_{name}",
-            pyo.Constraint(self.model.T, rule = band_down_limit),
+            pyo.Constraint(self.model.T, rule=band_down_limit),
         )
 
     def _objective_maximize_revenues(self) -> pyo.ConcreteModel:
         epsilon = 1e-3
         self.model.objective = pyo.Objective(
-            expr = (
+            expr=(
                 sum(
-                getattr(self.model, f"Revenues_{market.__class__.__name__}")
-                for market in self.markets
+                    getattr(self.model, f"Revenues_{market.__class__.__name__}")
+                    for market in self.markets
                 )
             ),
-            sense = pyo.maximize,
+            sense=pyo.maximize,
         )
 
         return self.model
@@ -319,24 +286,20 @@ class PerfectOptimizer(Optimizer):
             "threads": 12,
         }
 
-        results = solver.solve(
-            self.model,
-            tee = True,
-            options = options)
-        
+        results = solver.solve(self.model, tee=True, options=options)
+
         if (
             results.solver.status != SolverStatus.ok
-            or results.solver.termination_condition
-            != TerminationCondition.optimal
+            or results.solver.termination_condition != TerminationCondition.optimal
         ):
             raise RuntimeError("Optimización fallida")
-        
+
         self.results = SimulationResult(
-            optimizer_name = self.__class__.__name__,
-            markets = self.markets,
-            system = self.system,
-            simulation = self.model,
-            )
+            optimizer_name=self.__class__.__name__,
+            markets=self.markets,
+            system=self.system,
+            simulation=self.model,
+        )
 
         return self.model
 
@@ -344,5 +307,5 @@ class PerfectOptimizer(Optimizer):
         self._model_setup()
         self._objective_maximize_revenues()
         self._solve()
-        
+
         return self

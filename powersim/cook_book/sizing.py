@@ -5,16 +5,17 @@ from ..assets.modules import System
 from ..markets.markets import DayAhead
 from ..optimizers.milp_optimizer import PerfectOptimizer
 
+
 class Sizing:
     @staticmethod
     def sizing_export_pv_bess(
-            systems: list[System],
-            market: DayAhead,
-            path: str | None = None,
-        ):
+        systems: list[System],
+        market: DayAhead,
+        path: str | None = None,
+    ):
         """
         Obtains the revenues for the chosen configurations of a system with one photovoltaic object and one battery object.
-        
+
         :var system: Description
         :vartype system: float
         :var filename: Description
@@ -25,8 +26,10 @@ class Sizing:
 
         for system in systems:
             print(system)
-            optimizer = PerfectOptimizer(system = system, market = market).solve()
-            system_revenues: dict = {"revenues": optimizer.results.operation_timeseries_year.iloc[0]["B_benefit"]}
+            optimizer = PerfectOptimizer(system=system, market=market).solve()
+            system_revenues: dict = {
+                "revenues": optimizer.results.operation_timeseries_year.iloc[0]["B_benefit"]
+            }
 
             photovoltaic_dict: dict = {**system.generators[0].__dict__}
             battery_dict: dict = {**system.batteries[0].__dict__}
@@ -35,10 +38,10 @@ class Sizing:
             del system_dict["generators"]
             del system_dict["batteries"]
 
-            data:dict = {**photovoltaic_dict, **battery_dict, **system_dict, **system_revenues}
+            data: dict = {**photovoltaic_dict, **battery_dict, **system_dict, **system_revenues}
             rows.append(data)
 
         df_export: pd.DataFrame = pd.DataFrame(rows)
-        df_export.to_excel(excel_writer = path)
+        df_export.to_excel(excel_writer=path)
 
         return df_export

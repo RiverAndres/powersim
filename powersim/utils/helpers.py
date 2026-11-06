@@ -1,4 +1,3 @@
-
 def calculate_time_deltas(time_index) -> dict:
     """
     Devuelve un dict:

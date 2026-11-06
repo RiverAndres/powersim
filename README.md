@@ -80,7 +80,7 @@ pytest
 from powersim import System, Battery, DayAhead, PerfectOptimizer
 
 # 1. Describe the system
-system = System(capacity_buy=50.0, capacity_sell=50.0, efficiency=0.95)   # MW, MW, -
+system = System(capacity_buy=50.0, capacity_sell=50.0, efficiency=0.95)  # MW, MW, -
 system.add_module(Battery(capacity=100, rte=0.85, c_rate=0.5, name="bat001"))
 # Photovoltaic plants are added the same way with system.add_module(...)
 
@@ -96,9 +96,9 @@ optimizer = PerfectOptimizer(system, [day_ahead], solver_name="highs")
 
 # 4. Build and solve the model, then inspect the results
 optimizer.solve()
-results = optimizer.results                  # SimulationResult
+results = optimizer.results  # SimulationResult
 
-print(results.operation_timeseries)          # time series of the whole operation
+print(results.operation_timeseries)  # time series of the whole operation
 results.plot_operation()
 results.export("results.xlsx")
 ```
@@ -181,7 +181,7 @@ class PerfectOptimizer(Optimizer):
     }
 
     def __init__(self, system, markets, *, solver_name="highs", precision=1):
-        super().__init__(system, markets)   # converts (copies) the system and the markets
+        super().__init__(system, markets)  # converts (copies) the system and the markets
         self.solver_name = solver_name
         self.precision = precision
 ```

@@ -12,14 +12,12 @@ CACHE_DIR.mkdir(exist_ok=True)
 
 LAST_CLEANUP_FILE = CACHE_DIR / ".last_cleanup"
 
+
 def _build_cache_key(func_name, args, kwargs):
-    payload = {
-        "func": func_name,
-        "args": args,
-        "kwargs": kwargs
-    }
+    payload = {"func": func_name, "args": args, "kwargs": kwargs}
     payload_json = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.md5(payload_json.encode()).hexdigest()
+
 
 def _cleanup_cache(ttl_seconds):
     now = time.time()
@@ -38,6 +36,7 @@ def _cleanup_cache(ttl_seconds):
                 pass
 
     LAST_CLEANUP_FILE.write_text(str(now))
+
 
 def df_cache(ttl_seconds=86400):
     def decorator(func):
@@ -65,7 +64,7 @@ def df_cache(ttl_seconds=86400):
                 pickle.dump(df, f)
 
             return df
-        
+
         return wrapper
-    
+
     return decorator
