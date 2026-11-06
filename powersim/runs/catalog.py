@@ -46,7 +46,8 @@ def list_runs(root: str | Path = DEFAULT_RUNS_DIR) -> pd.DataFrame:
 
     if not rows:
         return pd.DataFrame(columns=_COLUMNS)
-    return pd.DataFrame(rows).sort_values("created_at", ascending=False, ignore_index=True)
+    # The id starts with the creation time too; it breaks ties between runs of the same second.
+    return pd.DataFrame(rows).sort_values(["created_at", "id"], ascending=False, ignore_index=True)
 
 
 def _read_json(path: Path) -> dict:
