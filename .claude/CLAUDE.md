@@ -8,7 +8,7 @@ Spanish: reply in Spanish. Code, identifiers and docstrings are in English.
 
 - Windows + PowerShell. Always use the venv: `.venv\Scripts\python.exe`
 - Python >= 3.12 (required by `esios_request`).
-- Install: `.venv\Scripts\python.exe -m pip install -e ".[dev]"`
+- Install: `.venv\Scripts\python.exe -m pip install -e ".[dev,dashboard]"`
 - Tests: `.venv\Scripts\python.exe -m pytest`
 - Lint/format: `.venv\Scripts\python.exe -m ruff check .` / `... -m ruff format .`
 - Default solver: HiGHS (`highspy`), no external installation needed.
@@ -33,7 +33,15 @@ Strict separation between **what is studied** (domain) and **how it is optimized
     **The user's objects are never modified.**
   - `powersim/optimizers/milp_optimizer/`: `PerfectOptimizer` (`milp_model.py`), market `Milp_*`
     classes (`milp_markets.py`) and module classes (`milp_modules.py`, with `Milp_System.module_map`).
-- Results: `powersim/visualization/results.py` (`SimulationResult`: plots and Excel export).
+- Results: `powersim/visualization/results.py` (`SimulationResult`: plots and Excel export;
+  `to_run()`). Colors shared with the dashboard live in `powersim/visualization/styles.py`.
+- Runs: `powersim/runs/` (`SimulationRun`, `list_runs`). A run is the standardized,
+  optimizer-independent export of one simulation, saved as a folder in `runs/` (git-ignored):
+  JSON (manifest, inputs, solver, kpis) + Parquet in long format (timeseries, market_data).
+  Changing what a run stores means bumping `SCHEMA_VERSION` in `powersim/runs/run.py`.
+- Dashboard: `powersim/dashboard/` (optional extra `dashboard`; command `powersim-dashboard`).
+  It **only reads saved runs**, never runs simulations; figures pick series by variable prefix
+  (`p_`, `P_sell_`, `Band_up_`...), not by market name, so keep those prefixes for new markets.
 - `powersim/cook_book/`: high-level recipes (sizing, reports).
 - `powersim/utils/cache.py`: disk cache (`%TEMP%/powersim_cache`).
 

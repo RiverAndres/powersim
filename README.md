@@ -13,6 +13,7 @@ It lets you describe a system (for now, batteries and/or photovoltaic plants), c
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick start](#quick-start)
+- [Saving and viewing runs](#saving-and-viewing-runs)
 - [Core concepts](#core-concepts)
 - [Architecture and extending the library](#architecture-and-extending-the-library)
 
@@ -104,6 +105,46 @@ results.export("results.xlsx")
 ```
 
 `add_module` returns the system, so calls can be chained.
+
+## Saving and viewing runs
+
+A simulation can be saved as a **run**: a self-contained folder with everything needed to inspect
+or reproduce it.
+
+```python
+run = optimizer.results.to_run(label="BESS 50 MW / 2 h", tags=["day-ahead"])
+run.save()             # -> runs/<date>_<label>_<id>/ (never overwrites a previous run)
+```
+
+```
+runs/2026-11-06T15-30-00_bess-50-mw-2-h_a1b2c3/
+  manifest.json        id, date, label, tags, powersim version and git commit
+  inputs.json          system, modules, markets, period and optimizer parameters
+  solver.json          status, objective, solve time, model size
+  kpis.json            revenues (total and per market), energies, equivalent cycles...
+  timeseries.parquet   operation, long format (time, variable, value)
+  market_data.parquet  market input data used (time, market, dataset, value)
+```
+
+Saved runs can be loaded and listed:
+
+```python
+from powersim import SimulationRun, list_runs
+
+catalog = list_runs("runs")                      # one row per run, with its KPIs
+run = SimulationRun.load(catalog.loc[0, "path"])
+run.timeseries_wide()                            # one column per variable
+```
+
+### Dashboard
+
+A local [Dash](https://dash.plotly.com/) app lets you pick a saved run in a side panel and see
+its KPIs and operation charts (the same charts as `plot_operation()`). It only reads saved runs.
+
+```bash
+pip install -e ".[dashboard]"
+powersim-dashboard --runs runs      # then open http://127.0.0.1:8050
+```
 
 ## Core concepts
 
