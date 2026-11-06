@@ -42,6 +42,12 @@ Strict separation between **what is studied** (domain) and **how it is optimized
 - Dashboard: `powersim/dashboard/` (optional extra `dashboard`; command `powersim-dashboard`).
   It **only reads saved runs**, never runs simulations; figures pick series by variable prefix
   (`p_`, `P_sell_`, `Band_up_`...), not by market name, so keep those prefixes for new markets.
+  Layout: tabs (tools) on the left, run selector on the right (shared by all tabs). Each tab is a
+  module in `powersim/dashboard/tabs/` exposing `TAB` (registered in `TABS`), with component ids
+  prefixed by the tab id, and has working notes in `.claude/dashboard/<tab id>.md` (purpose,
+  layout description, right side panel, decisions); the header, left panel and shared style are
+  in `.claude/dashboard/app.md`. Read them before changing the dashboard and keep them updated. New views are
+  tried in the **Sandbox** tab first and moved to their tab only when the user approves them.
 - `powersim/cook_book/`: high-level recipes (sizing, reports).
 - `powersim/utils/cache.py`: disk cache (`%TEMP%/powersim_cache`).
 
