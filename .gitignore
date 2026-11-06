@@ -38,3 +38,6 @@ ENV/
 # Other stuff
 main.py
 *.egg-info/
+
+# Claude Code hook state (local)
+.claude/hooks/.tests_on_stop_state

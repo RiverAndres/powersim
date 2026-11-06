@@ -55,6 +55,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.venv/Scripts/python.exe\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/tests_on_stop.py\"",
+            "timeout": 180,
+            "statusMessage": "Running tests (Python files changed)..."
+          }
+        ]
+      }
     ]
   }
 }

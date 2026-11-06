@@ -100,5 +100,9 @@ domain name (`"AFRR"`).
   paths, even inside a string: keep them out of commands (e.g. put test data in a file).
 - A PostToolUse hook (`.claude/hooks/ruff_format.py`) runs `ruff format` on every edited `.py`
   file, so edited regions may be reformatted: re-read before a follow-up edit there.
+- A Stop hook (`.claude/hooks/tests_on_stop.py`) runs pytest at the end of a turn if any `.py`
+  under `powersim/` or `tests/` changed since its last run, and warns the user on failures. It is
+  informative on purpose (it never blocks), so tests can be left failing across turns when the
+  user asks (e.g. test first, fix later). Still run the tests yourself after each change.
 - `main.py` is a personal test script (ignored by git); do not treat it as part of the library.
 - Keep `README.md` consistent when the public API changes.
