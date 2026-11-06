@@ -44,3 +44,8 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
+# Explicit rule set, so results do not change when ruff updates its defaults.
+# E/F: pycodestyle and pyflakes; I: import sorting; UP: pyupgrade; B: bugbear.
+select = ["E", "F", "I", "UP", "B"]
