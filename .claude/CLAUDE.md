@@ -94,6 +94,11 @@ domain name (`"AFRR"`).
 
 ## Rules
 
-- **Never** read or display `env/` or `.env`: they contain the user's ESIOS token.
+- **Never** read or display `env/` or `.env`: they contain the user's secrets (ESIOS token).
+  Enforced by `.claude/settings.json` (Read deny) and the PreToolUse hook
+  `.claude/hooks/guard_secrets.py`, which also blocks any shell command that mentions those
+  paths, even inside a string: keep them out of commands (e.g. put test data in a file).
+- A PostToolUse hook (`.claude/hooks/ruff_format.py`) runs `ruff format` on every edited `.py`
+  file, so edited regions may be reformatted: re-read before a follow-up edit there.
 - `main.py` is a personal test script (ignored by git); do not treat it as part of the library.
 - Keep `README.md` consistent when the public API changes.
