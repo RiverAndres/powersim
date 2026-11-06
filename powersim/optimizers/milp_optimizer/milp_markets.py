@@ -1,6 +1,7 @@
 import pandas as pd
 import pyomo.environ as pyo
-from ...markets.markets import DayAhead, IntraDay01, IntraDay02, IntraDay03, AFRR, MFRR
+
+from ...markets.markets import AFRR, MFRR, DayAhead, IntraDay01, IntraDay02, IntraDay03
 
 
 class Milp_DayAhead(DayAhead):

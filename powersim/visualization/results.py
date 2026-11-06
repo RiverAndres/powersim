@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-import numpy as np
 import pyomo.environ as pyo
 
-from ..assets.modules import System, Battery, Photovoltaic
+from ..assets.modules import System
 from ..markets.markets import Market
 
 
@@ -292,29 +291,29 @@ class SimulationResult:
 
         styles = {
             "colors": {
-                f"P_sell_DayAhead": "turquoise",
-                f"P_buy_DayAhead": "turquoise",
-                f"P_sell_IntraDay01": "mediumspringgreen",
-                f"P_buy_IntraDay01": "mediumspringgreen",
-                f"P_sell_IntraDay02": "mediumseagreen",
-                f"P_buy_IntraDay02": "mediumseagreen",
-                f"P_sell_IntraDay03": "forestgreen",
-                f"P_buy_IntraDay03": "forestgreen",
-                f"Band_up_AFRR": "lightsalmon",
-                f"Band_down_AFRR": "lightsalmon",
-                f"P_up_AFRR": "red",
-                f"P_down_AFRR": "red",
-                f"P_sell_MFRR": "gold",
-                f"P_buy_MFRR": "gold",
-                f"p_DayAhead": "turquoise",
-                f"p_IntraDay01": "mediumspringgreen",
-                f"p_IntraDay02": "mediumseagreen",
-                f"p_IntraDay03": "forestgreen",
-                f"p_up_AFRR": "lightsalmon",
-                f"p_down_AFRR": "lightsalmon",
-                f"p_act_up_AFRR": "red",
-                f"p_act_down_AFRR": "red",
-                f"p_MFRR": "gold",
+                "P_sell_DayAhead": "turquoise",
+                "P_buy_DayAhead": "turquoise",
+                "P_sell_IntraDay01": "mediumspringgreen",
+                "P_buy_IntraDay01": "mediumspringgreen",
+                "P_sell_IntraDay02": "mediumseagreen",
+                "P_buy_IntraDay02": "mediumseagreen",
+                "P_sell_IntraDay03": "forestgreen",
+                "P_buy_IntraDay03": "forestgreen",
+                "Band_up_AFRR": "lightsalmon",
+                "Band_down_AFRR": "lightsalmon",
+                "P_up_AFRR": "red",
+                "P_down_AFRR": "red",
+                "P_sell_MFRR": "gold",
+                "P_buy_MFRR": "gold",
+                "p_DayAhead": "turquoise",
+                "p_IntraDay01": "mediumspringgreen",
+                "p_IntraDay02": "mediumseagreen",
+                "p_IntraDay03": "forestgreen",
+                "p_up_AFRR": "lightsalmon",
+                "p_down_AFRR": "lightsalmon",
+                "p_act_up_AFRR": "red",
+                "p_act_down_AFRR": "red",
+                "p_MFRR": "gold",
             }
         }
 

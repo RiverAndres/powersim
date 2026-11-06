@@ -1,10 +1,11 @@
-import pandas as pd
+import copy
+from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Literal
+
 import numpy as np
+import pandas as pd
 from esios_request import esios_get_indicator
-from abc import ABC, abstractmethod
-import copy
 
 
 class Market(ABC):

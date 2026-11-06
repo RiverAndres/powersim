@@ -1,23 +1,20 @@
 import pyomo.environ as pyo
 from pyomo.opt import SolverStatus, TerminationCondition
-import pandas as pd
-import numpy as np
 
-from ...visualization.results import SimulationResult
+from ...assets.modules import System
+from ...markets.markets import AFRR, MFRR, DayAhead, IntraDay01, IntraDay02, IntraDay03, Market
 from ...utils.helpers import calculate_time_deltas
-
-from ...assets.modules import System, Battery, Photovoltaic
-from .milp_modules import Milp_System, Milp_Battery, Milp_Photovoltaic
-from ...markets.markets import Market, DayAhead, IntraDay01, IntraDay02, IntraDay03, AFRR, MFRR
+from ...visualization.results import SimulationResult
+from ..optimizer import Optimizer
 from .milp_markets import (
+    Milp_AFRR,
     Milp_DayAhead,
     Milp_IntraDay01,
     Milp_IntraDay02,
     Milp_IntraDay03,
-    Milp_AFRR,
     Milp_MFRR,
 )
-from ..optimizer import Optimizer
+from .milp_modules import Milp_System
 
 
 class PerfectOptimizer(Optimizer):
@@ -147,7 +144,7 @@ class PerfectOptimizer(Optimizer):
             )
 
         self.model.add_component(
-            f"Total_power_pre_allocated",
+            "Total_power_pre_allocated",
             pyo.Expression(self.model.T, rule=total_power_pre_allocated),
         )
 

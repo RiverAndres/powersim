@@ -1,6 +1,7 @@
 # Use case where a set of system configurations are studied to determine the optimal one.
 # The data is exported to the specified address in Excel format, by default in downloads.
 import pandas as pd
+
 from ..assets.modules import System
 from ..markets.markets import DayAhead
 from ..optimizers.milp_optimizer import PerfectOptimizer
