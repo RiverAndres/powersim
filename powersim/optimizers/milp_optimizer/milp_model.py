@@ -253,7 +253,6 @@ class PerfectOptimizer(Optimizer):
         )
 
     def _objective_maximize_revenues(self) -> pyo.ConcreteModel:
-        epsilon = 1e-3
         self.model.objective = pyo.Objective(
             expr=(
                 sum(

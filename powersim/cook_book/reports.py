@@ -15,7 +15,6 @@ class Reports:
         """
         start_date = "2025/01/01T00:00:00Z"
         end_date = "2025/12/31T23:59:00Z"
-        filename = "treseLike_results_5MW_2h5MWgridch"
 
         req_year = 2025
         base_offset = start_year - req_year - 1
@@ -162,7 +161,6 @@ class Reports:
 
             optimizer = PerfectOptimizer(system=system, markets=markets, precision=2).solve()
             # optimizer.results.plot_operation()
-            results = optimizer.results.operation_timeseries.copy()
             # results["DA_BESS_Revenue"] = results[f"p_DayAhead"] * 0
             # results["DA_PV_Revenue"] = results[f"p_DayAhead"] * 0
             # results["BESS_Charge_Cost"] = results[f"p_DayAhead"] * 0

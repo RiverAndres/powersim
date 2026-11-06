@@ -49,3 +49,5 @@ target-version = "py312"
 # Explicit rule set, so results do not change when ruff updates its defaults.
 # E/F: pycodestyle and pyflakes; I: import sorting; UP: pyupgrade; B: bugbear.
 select = ["E", "F", "I", "UP", "B"]
+# Line length is enforced by ruff format; long strings/comments it cannot split are allowed.
+ignore = ["E501"]
