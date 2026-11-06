@@ -232,29 +232,10 @@ class PerfectOptimizer(Optimizer):
         )
 
             ## Limitation in Band_up and Band_down
+        # Markets are already converted to their Milp_* classes: check the domain class.
         for market in self.markets:
-            if market.__class__.__name__ == "AFRR":
-                self.model.add_component(
-                    f"band_up_operational_limit_{market.__class__.__name__}",
-                    pyo.Constraint(
-                        self.model.T,
-                        rule = lambda m, t: (
-                            getattr(self.model, f"Band_up_{market.__class__.__name__}")[t]
-                            <= m.system_capacity_export - getattr(self.model, f"Total_power_pre_allocated")[t]
-                        )
-                    )
-                )
-
-                self.model.add_component(
-                    f"band_down_operational_limit_{market.__class__.__name__}",
-                    pyo.Constraint(
-                        self.model.T,
-                        rule = lambda m, t: (
-                            getattr(self.model, f"Band_down_{market.__class__.__name__}")[t]
-                            <= m.system_capacity_import + getattr(self.model, f"Total_power_pre_allocated")[t]
-                        )
-                    )
-                )
+            if isinstance(market, AFRR):
+                self._add_afrr_band_limits(market.name)
 
                 # self.model.export = pyo.Var(self.model.T, within = pyo.Binary, initialize = 0)
 
@@ -279,7 +260,34 @@ class PerfectOptimizer(Optimizer):
                 # )
                 
         return self.model
-    
+
+    def _add_afrr_band_limits(self, name: str) -> None:
+        """Limit the aFRR bands to the grid capacity left free by the energy markets.
+
+        ``name`` is bound as an argument (not taken from a loop variable) so the rules
+        always refer to this market's components.
+
+        TODO: bands are not limited by the unit (battery) power, only by the grid. See .claude/TODO.md.
+        """
+        band_up = getattr(self.model, f"Band_up_{name}")
+        band_down = getattr(self.model, f"Band_down_{name}")
+        pre_allocated = self.model.Total_power_pre_allocated
+
+        def band_up_limit(m, t):
+            return band_up[t] <= m.system_capacity_export - pre_allocated[t]
+
+        def band_down_limit(m, t):
+            return band_down[t] <= m.system_capacity_import + pre_allocated[t]
+
+        self.model.add_component(
+            f"band_up_operational_limit_{name}",
+            pyo.Constraint(self.model.T, rule = band_up_limit),
+        )
+        self.model.add_component(
+            f"band_down_operational_limit_{name}",
+            pyo.Constraint(self.model.T, rule = band_down_limit),
+        )
+
     def _objective_maximize_revenues(self) -> pyo.ConcreteModel:
         epsilon = 1e-3
         self.model.objective = pyo.Objective(

@@ -1,0 +1,45 @@
+# TODO
+
+Pending work that was analysed but deliberately postponed. Known bugs with a reproducing test
+are tracked as `xfail(strict=True)` tests in `tests/`, not here.
+
+## Optimizers: review `PerfectOptimizer` constraints
+
+`PerfectOptimizer` is likely under-constrained: it can reach solutions that are physically
+feasible period by period but not admissible in the market. To be revisited as a whole when
+working on the optimizers in detail.
+
+### aFRR band limited by unit capability (not only by grid capacity)
+
+**Problem.** `Band_up` / `Band_down` are only limited by the grid connection
+(`capacity_sell` / `capacity_buy`) and by what the energy markets already use
+(`Total_power_pre_allocated`). Nothing links them to the battery power.
+
+Example: grid 10 MW, battery 10 MWh / 2.5 MW, band price 50 €/MW.
+- Hours without activation: it offers 10 MW of band and collects 4x the band revenue the
+  battery could really back.
+- Hours with full activation (`bin_max`): it must deliver `P_up` = 10 MW but only discharges
+  2.5 MW. It closes the balance by **buying 7.5 MW in day-ahead**, a schedule the battery could
+  not execute on its own (it only works because the activation is known in advance).
+
+Market rule: the band offered cannot exceed what the unit could deliver if fully activated,
+whether or not it is finally activated.
+
+**Proposal** (linear, no binaries):
+
+```
+Band_up[t]   <= sum(Pmax_bat) + generation[t] - Total_power_pre_allocated[t]
+Band_down[t] <= sum(Pmax_bat)                 + Total_power_pre_allocated[t]
+# optional: energy-market schedule executable on its own
+-sum(Pmax_bat) <= Total_power_pre_allocated[t] <= sum(Pmax_bat) + generation[t]
+```
+
+Open questions:
+- Whether to add the third constraint, or accept that advantage of perfect foresight.
+- How `System.efficiency` enters (today it is only applied to export).
+
+**Not to do:** reserve energy (SOC) for activations. Activations are predefined inputs and the
+perfect-foresight model already guarantees they are met.
+
+**First step when implementing:** a test with the example above (2.5 MW battery, 10 MW grid)
+that shows the band exceeding the battery power.
