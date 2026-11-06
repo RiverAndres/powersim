@@ -59,16 +59,25 @@ powersim aims to simulate a possible *real* operation of a *real* asset. Planned
 
 ## Installation
 
-<!-- TODO: add the installation instructions (PyPI / source) -->
+powersim is not published on PyPI. Install it from GitHub:
 
 ```bash
-pip install powersim
+pip install git+https://github.com/RiverAndres/powersim.git
+```
+
+Or, for development, from a local clone:
+
+```bash
+git clone https://github.com/RiverAndres/powersim.git
+cd powersim
+pip install -e ".[dev]"
+pytest
 ```
 
 ## Quick start
 
 ```python
-from powersim import System, Battery, DayAhead, PerfectOptimizer  # adjust the import paths to your package layout
+from powersim import System, Battery, DayAhead, PerfectOptimizer
 
 # 1. Describe the system
 system = System(capacity_buy=50.0, capacity_sell=50.0, efficiency=0.95)   # MW, MW, -
@@ -85,8 +94,13 @@ day_ahead = DayAhead().get_info(
 # 3. Create the optimizer (your system and markets are copied, not modified)
 optimizer = PerfectOptimizer(system, [day_ahead], solver_name="highs")
 
-# 4. Build, solve and inspect the model
-# <TODO: add the call that runs the optimization and the way to read the results>
+# 4. Build and solve the model, then inspect the results
+optimizer.solve()
+results = optimizer.results                  # SimulationResult
+
+print(results.operation_timeseries)          # time series of the whole operation
+results.plot_operation()
+results.export("results.xlsx")
 ```
 
 `add_module` returns the system, so calls can be chained.
@@ -154,20 +168,25 @@ Each optimizer converts the objects it receives into its own optimization classe
 
 ### Adding a new optimizer
 
-Subclass `Optimizer`, declare which classes it uses, and add its own parameters if it needs any:
+Subclass `Optimizer` (`powersim.optimizers.optimizer`), declare which classes it uses, and add its own parameters if it needs any. This is how `PerfectOptimizer` does it (`powersim/optimizers/milp_optimizer/milp_model.py`):
 
 ```python
-class RollingOptimizer(Optimizer):
-    system_class = Rolling_System
+class PerfectOptimizer(Optimizer):
+    system_class = Milp_System
     market_map = {
-        DayAhead: Rolling_DayAhead,
+        DayAhead: Milp_DayAhead,
+        IntraDay01: Milp_IntraDay01,
+        # ...
+        AFRR: Milp_AFRR,
     }
 
-    def __init__(self, system, markets, *, window_hours: int, step_hours: int, **kwargs):
-        super().__init__(system, markets, **kwargs)   # common parameters and conversion
-        self.window_hours = window_hours
-        self.step_hours = step_hours
+    def __init__(self, system, markets, *, solver_name="highs", precision=1):
+        super().__init__(system, markets)   # converts (copies) the system and the markets
+        self.solver_name = solver_name
+        self.precision = precision
 ```
+
+A new optimizer follows the same pattern with its own child classes (its system class with a `module_map`, and one child class per supported market) and its own `solve()`.
 
 If a market has no entry in `market_map`, the optimizer raises a `TypeError` that names the missing market.
 
