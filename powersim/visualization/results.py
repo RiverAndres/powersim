@@ -4,6 +4,7 @@ import pyomo.environ as pyo
 
 from ..assets.modules import System
 from ..markets.markets import Market
+from .styles import MARKET_COLORS
 
 
 class SimulationResult:
@@ -17,11 +18,14 @@ class SimulationResult:
         markets: list[Market],
         system: System,
         simulation: pyo.ConcreteModel,
+        metadata: dict | None = None,
     ):
         self.optimizer_name = optimizer_name
         self.markets = markets
         self.system = system
         self.simulation = simulation
+        # Optimizer parameters and solver information (status, objective, time...), if provided.
+        self.metadata = metadata or {}
 
         self.operation_storage_list = [b.results(self.simulation) for b in self.system.batteries]
         self.operation_generation_list = [g.results() for g in self.system.generators]
@@ -289,33 +293,7 @@ class SimulationResult:
         Detailed graphs that shopw the timeseries of the operation of the system and the exchanges of enrgy between modules and the grid.
         """
 
-        styles = {
-            "colors": {
-                "P_sell_DayAhead": "turquoise",
-                "P_buy_DayAhead": "turquoise",
-                "P_sell_IntraDay01": "mediumspringgreen",
-                "P_buy_IntraDay01": "mediumspringgreen",
-                "P_sell_IntraDay02": "mediumseagreen",
-                "P_buy_IntraDay02": "mediumseagreen",
-                "P_sell_IntraDay03": "forestgreen",
-                "P_buy_IntraDay03": "forestgreen",
-                "Band_up_AFRR": "lightsalmon",
-                "Band_down_AFRR": "lightsalmon",
-                "P_up_AFRR": "red",
-                "P_down_AFRR": "red",
-                "P_sell_MFRR": "gold",
-                "P_buy_MFRR": "gold",
-                "p_DayAhead": "turquoise",
-                "p_IntraDay01": "mediumspringgreen",
-                "p_IntraDay02": "mediumseagreen",
-                "p_IntraDay03": "forestgreen",
-                "p_up_AFRR": "lightsalmon",
-                "p_down_AFRR": "lightsalmon",
-                "p_act_up_AFRR": "red",
-                "p_act_down_AFRR": "red",
-                "p_MFRR": "gold",
-            }
-        }
+        styles = {"colors": MARKET_COLORS}
 
         fig1, (ax_gen, ax_storage, ax_system) = plt.subplots(3, 1, sharex=True, sharey=True)
         fig2, (ax_market_prices, ax_market_operation) = plt.subplots(2, 1, sharex=True)
@@ -501,3 +479,13 @@ class SimulationResult:
         Save as pickle simulation results, by default in cache.
         """
         pass
+
+    def to_run(self, label: str | None = None, tags: list[str] | None = None):
+        """
+        Standardized, optimizer-independent export of this simulation.
+
+        Returns a :class:`powersim.runs.SimulationRun`; call ``run.save()`` to store it on disk.
+        """
+        from ..runs.run import SimulationRun
+
+        return SimulationRun.from_result(self, label=label, tags=tags)

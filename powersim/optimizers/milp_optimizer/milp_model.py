@@ -1,3 +1,5 @@
+import time
+
 import pyomo.environ as pyo
 from pyomo.opt import SolverStatus, TerminationCondition
 
@@ -282,7 +284,9 @@ class PerfectOptimizer(Optimizer):
             "threads": 12,
         }
 
+        start = time.perf_counter()
         results = solver.solve(self.model, tee=True, options=options)
+        solve_time_s = time.perf_counter() - start
 
         if (
             results.solver.status != SolverStatus.ok
@@ -290,11 +294,24 @@ class PerfectOptimizer(Optimizer):
         ):
             raise RuntimeError("Optimización fallida")
 
+        metadata = {
+            "optimizer_params": {"solver_name": self.solver_name, "precision": self.precision},
+            "solver": {
+                "status": str(results.solver.status),
+                "termination_condition": str(results.solver.termination_condition),
+                "objective": pyo.value(self.model.objective),
+                "solve_time_s": solve_time_s,
+                "n_variables": self.model.nvariables(),
+                "n_constraints": self.model.nconstraints(),
+            },
+        }
+
         self.results = SimulationResult(
             optimizer_name=self.__class__.__name__,
             markets=self.markets,
             system=self.system,
             simulation=self.model,
+            metadata=metadata,
         )
 
         return self.model

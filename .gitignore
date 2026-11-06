@@ -41,3 +41,6 @@ main.py
 
 # Claude Code hook state (local)
 .claude/hooks/.tests_on_stop_state
+
+# Saved simulation runs (powersim.runs)
+/runs/

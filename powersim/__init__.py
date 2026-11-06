@@ -2,6 +2,7 @@ from .assets import Battery, Photovoltaic, System
 from .cook_book import CookBook
 from .markets import AFRR, MFRR, DayAhead, IntraDay01, IntraDay02, IntraDay03
 from .optimizers import PerfectOptimizer
+from .runs import SimulationRun, list_runs
 
 __all__ = [
     "DayAhead",
@@ -15,4 +16,6 @@ __all__ = [
     "Battery",
     "PerfectOptimizer",
     "CookBook",
+    "SimulationRun",
+    "list_runs",
 ]
