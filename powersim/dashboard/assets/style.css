@@ -1,0 +1,251 @@
+/* powersim dashboard: dark theme (palette and type inspired by Mantine's dark scheme). */
+
+:root {
+  --text: #f0efec;
+  --text-dim: #a3a29a;
+  --text-faint: #898781;
+  --border: #383835;
+  --border-strong: #4a4a46;
+  --card: #232322;
+  --body: #1a1a19;
+  --sunken: #121211;
+  --accent: #4dabf7;
+  --accent-soft: rgba(77, 171, 247, 0.15);
+  --positive: #69db7c;
+  --radius: 8px;
+  --header-height: 64px;
+  --font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--body);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+}
+
+/* ---------- Header ---------- */
+
+.header {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.title { margin: 0; font-size: 18px; font-weight: 600; }
+
+.header-info {
+  flex-grow: 1;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ---------- Shell ---------- */
+
+.shell { display: flex; height: calc(100vh - var(--header-height)); }
+
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  padding: 20px 16px;
+  background: var(--card);
+  overflow-y: auto;
+}
+
+.sidebar-left { width: 220px; border-right: 1px solid var(--border); }
+.sidebar-right { border-left: 1px solid var(--border); }
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.sidebar-title { margin: 0; font-size: 15px; font-weight: 600; }
+
+.sidebar-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  word-break: break-all;
+  margin-bottom: 16px;
+}
+
+.button {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.button:hover { color: var(--text); border-color: var(--text-faint); }
+
+/* Selectable lists (dcc.RadioItems rendered as cards): tabs and runs */
+.option-list label {
+  display: block;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--body);
+  cursor: pointer;
+  line-height: 1.4;
+  transition: border-color 0.15s, background 0.15s;
+}
+.option-list label:hover { border-color: var(--border-strong); }
+.option-list label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.option-list input[type="radio"] { display: none; }
+
+.option-label { font-weight: 500; color: var(--text); }
+.option-meta { font-size: 12px; color: var(--text-faint); }
+
+.main {
+  flex-grow: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tab-pane { flex-direction: column; gap: 16px; }
+
+.sandbox-note {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* ---------- Status row ---------- */
+
+.status-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--positive);
+  box-shadow: 0 0 0 4px rgba(105, 219, 124, 0.15);
+}
+
+.run-title { margin: 0; font-size: 20px; font-weight: 600; }
+
+.status-meta { color: var(--text-faint); font-size: 13px; }
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---------- KPI cards ---------- */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.kpi-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.kpi-unit { font-size: 12px; font-weight: 400; color: var(--text-dim); margin-left: 4px; }
+
+.kpi-sub { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+
+.kpi-primary { border-color: var(--accent); }
+.kpi-primary .kpi-value { color: var(--accent); }
+
+/* ---------- Chart cards ---------- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.card-title { margin: 0; font-size: 14px; font-weight: 600; }
+
+.card-hint { font-size: 12px; color: var(--text-faint); }
+
+.empty { color: var(--text-faint); padding: 40px 0; text-align: center; }

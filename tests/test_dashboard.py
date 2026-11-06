@@ -5,12 +5,16 @@ from test_runs import solve_known_case
 
 pytest.importorskip("dash")
 
-from powersim.dashboard.app import _kpis_panel, _run_option_label, create_app  # noqa: E402
+from powersim.dashboard.app import _run_option_label, create_app  # noqa: E402
+from powersim.dashboard.components import format_dt  # noqa: E402
 from powersim.dashboard.figures import (  # noqa: E402
     assets_figure,
     excess_figure,
     markets_figure,
 )
+from powersim.dashboard.tabs import TABS  # noqa: E402
+from powersim.dashboard.tabs.sandbox import daily_revenue_figure, soc_heatmap_figure  # noqa: E402
+from powersim.dashboard.tabs.visualization import kpi_cards  # noqa: E402
 from powersim.runs import list_runs  # noqa: E402
 
 
@@ -64,13 +68,62 @@ def test_app_builds_with_runs(afrr_run, tmp_path):
     app = create_app(tmp_path)
 
     layout = str(app.layout)
-    for component_id in ("run-selector", "assets-graph", "markets-graph", "excess-graph"):
+    for component_id in (
+        "header-info",
+        "tab-selector",
+        "run-selector",
+        "run-status",
+        "tab-visualization",
+        "tab-sandbox",
+        "visualization-kpis",
+        "visualization-assets",
+        "visualization-markets",
+        "visualization-excess",
+        "sandbox-daily-revenue",
+        "sandbox-soc-heatmap",
+    ):
         assert component_id in layout
 
     row = list_runs(tmp_path).iloc[0]
-    assert "With aFRR" in _run_option_label(row)
-    assert "Total revenue" in str(_kpis_panel(afrr_run))
+    assert "With aFRR" in str(_run_option_label(row))
+    cards = str(kpi_cards(afrr_run))
+    assert "Total revenue" in cards
+    assert "Revenue AFRR" in cards
+
+
+def test_header_info_text(tmp_path):
+    assert "My info" in str(create_app(tmp_path, info="My info").layout)
 
 
 def test_app_builds_without_runs(tmp_path):
     assert create_app(tmp_path / "missing").layout is not None
+
+
+def test_tabs_have_unique_prefixed_ids():
+    assert [tab.id for tab in TABS] == ["visualization", "sandbox"]
+    for tab in TABS:
+        ids = [c.id for c in _walk(tab.layout()) if getattr(c, "id", None)]
+        assert all(i.startswith(f"{tab.id}-") for i in ids), ids
+
+
+def test_sandbox_figures(afrr_run):
+    data = afrr_run.timeseries_wide()
+    assert trace_names(daily_revenue_figure(data)) == {"DayAhead", "AFRR"}
+    heatmap = soc_heatmap_figure(data)
+    assert len(heatmap.data) == 1 and heatmap.data[0].type == "heatmap"
+
+
+def test_format_dt():
+    assert format_dt([1.0]) == "1 h"
+    assert format_dt([0.25]) == "15 min"
+    assert format_dt([]) == "-"
+
+
+def _walk(components):
+    for component in components:
+        yield component
+        children = getattr(component, "children", None)
+        if isinstance(children, list):
+            yield from _walk(children)
+        elif children is not None and not isinstance(children, str):
+            yield from _walk([children])

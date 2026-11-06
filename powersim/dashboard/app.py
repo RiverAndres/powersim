@@ -1,4 +1,8 @@
-"""Local Dash app to browse saved runs: side panel to pick a run, main area with its charts.
+"""Local Dash app to browse saved runs.
+
+Layout: a header (title and a free information text); a left panel to pick a tab (tool); a main
+area with the selected run's status and the active tab; and a right panel to pick the run, shared
+by all tabs. Tabs live in ``tabs/``; styles in ``assets/style.css`` (served by Dash).
 
 The app only reads runs saved with ``SimulationRun.save()``; it never runs simulations.
 
@@ -8,7 +12,6 @@ Usage::
 """
 
 import argparse
-from functools import lru_cache
 from pathlib import Path
 
 try:
@@ -18,59 +21,53 @@ except ImportError as error:  # pragma: no cover - depends on the installed extr
         "The dashboard needs the 'dashboard' extra: pip install \"powersim[dashboard]\""
     ) from error
 
-import plotly.graph_objects as go
+from ..runs import list_runs
+from .components import load_run, status_row
+from .tabs import TABS
 
-from ..runs import SimulationRun, list_runs
-from .figures import assets_figure, excess_figure, markets_figure
-
-SIDEBAR_STYLE = {
-    "width": "320px",
-    "flexShrink": 0,
-    "padding": "16px",
-    "borderRight": "1px solid #ddd",
-    "height": "100vh",
-    "overflowY": "auto",
-    "boxSizing": "border-box",
-    "fontFamily": "sans-serif",
-    "fontSize": "14px",
-}
-MAIN_STYLE = {"flexGrow": 1, "padding": "16px", "overflowY": "auto", "height": "100vh"}
+DEFAULT_INFO = (
+    "Simulations of energy assets operating in electricity markets. "
+    "Pick a tool on the left and a saved run on the right."
+)
+RUN_INPUT = Input("run-selector", "value")
 
 
-def create_app(runs_dir: str | Path = "runs") -> Dash:
+def create_app(runs_dir: str | Path = "runs", info: str = DEFAULT_INFO) -> Dash:
+    """Dash app over the runs saved in ``runs_dir``; ``info`` is the text shown in the header."""
     runs_dir = Path(runs_dir)
-    app = Dash(__name__, title="powersim runs")
+    app = Dash(__name__, title="powersim · runs")
 
     app.layout = html.Div(
-        style={"display": "flex"},
-        children=[
+        [
+            _header(info),
             html.Div(
-                style=SIDEBAR_STYLE,
+                className="shell",
                 children=[
-                    html.H3("Simulations", style={"marginTop": 0}),
-                    html.Div(str(runs_dir.resolve()), style={"color": "#888", "fontSize": "12px"}),
-                    html.Button("Refresh", id="refresh", style={"margin": "8px 0"}),
-                    dcc.RadioItems(
-                        id="run-selector",
-                        options=[],
-                        value=None,
-                        labelStyle={"display": "block", "marginBottom": "8px"},
+                    _tabs_sidebar(),
+                    html.Main(
+                        className="main",
+                        children=[
+                            html.Div(id="run-status", className="status-row"),
+                            *[
+                                html.Div(tab.layout(), id=f"tab-{tab.id}", className="tab-pane")
+                                for tab in TABS
+                            ],
+                        ],
                     ),
-                    html.Hr(),
-                    html.Div(id="run-kpis"),
+                    _runs_sidebar(runs_dir),
                 ],
             ),
-            html.Div(
-                style=MAIN_STYLE,
-                children=[
-                    html.H2(id="run-title", style={"fontFamily": "sans-serif", "marginTop": 0}),
-                    dcc.Graph(id="assets-graph"),
-                    dcc.Graph(id="markets-graph"),
-                    dcc.Graph(id="excess-graph"),
-                ],
-            ),
-        ],
+        ]
     )
+
+    # Every tab stays in the layout (so its callbacks always have their components); only the
+    # selected one is displayed.
+    @app.callback(
+        *[Output(f"tab-{tab.id}", "style") for tab in TABS],
+        Input("tab-selector", "value"),
+    )
+    def show_tab(selected):
+        return [{"display": "flex" if tab.id == selected else "none"} for tab in TABS]
 
     @app.callback(
         Output("run-selector", "options"),
@@ -87,76 +84,106 @@ def create_app(runs_dir: str | Path = "runs") -> Dash:
         value = current if current in paths else (paths[0] if paths else None)
         return options, value
 
-    @app.callback(
-        Output("run-title", "children"),
-        Output("run-kpis", "children"),
-        Output("assets-graph", "figure"),
-        Output("markets-graph", "figure"),
-        Output("excess-graph", "figure"),
-        Input("run-selector", "value"),
-    )
-    def show_run(path):
+    @app.callback(Output("run-status", "children"), RUN_INPUT)
+    def show_status(path):
         if not path:
-            empty = go.Figure()
-            return f"No saved runs in {runs_dir}", "", empty, empty, empty
-        run = _load_run(path)
-        title = run.label or run.id
-        return title, _kpis_panel(run), assets_figure(run), markets_figure(run), excess_figure(run)
+            return html.Div(f"No saved runs in {runs_dir}", className="empty")
+        return status_row(load_run(path))
+
+    for tab in TABS:
+        tab.register(app, RUN_INPUT)
 
     return app
 
 
-@lru_cache(maxsize=16)
-def _load_run(path: str) -> SimulationRun:
-    return SimulationRun.load(path)
+# ---------- Layout pieces ----------
 
 
-def _run_option_label(row) -> str:
+def _header(info: str):
+    return html.Header(
+        className="header",
+        children=[
+            html.Div(
+                className="brand",
+                children=[
+                    html.Div("⚡", className="brand-icon"),
+                    html.Div(
+                        [
+                            html.Div("Simulation runs", className="eyebrow"),
+                            html.H3("powersim", className="title"),
+                        ]
+                    ),
+                ],
+            ),
+            html.Div(info, id="header-info", className="header-info"),
+        ],
+    )
+
+
+def _tabs_sidebar():
+    options = [
+        {
+            "label": html.Div(
+                [
+                    html.Div(tab.label, className="option-label"),
+                    html.Div(tab.description, className="option-meta"),
+                ]
+            ),
+            "value": tab.id,
+        }
+        for tab in TABS
+    ]
+    return html.Nav(
+        className="sidebar sidebar-left",
+        children=[
+            html.Div(
+                className="sidebar-head", children=[html.H4("Tools", className="sidebar-title")]
+            ),
+            dcc.RadioItems(
+                id="tab-selector", options=options, value=TABS[0].id, className="option-list"
+            ),
+        ],
+    )
+
+
+def _runs_sidebar(runs_dir: Path):
+    return html.Aside(
+        className="sidebar sidebar-right",
+        children=[
+            html.Div(
+                className="sidebar-head",
+                children=[
+                    html.H4("Simulations", className="sidebar-title"),
+                    html.Button("Refresh", id="refresh", className="button"),
+                ],
+            ),
+            html.Div(str(runs_dir.resolve()), className="sidebar-path"),
+            dcc.RadioItems(id="run-selector", options=[], value=None, className="option-list"),
+        ],
+    )
+
+
+def _run_option_label(row):
     created = (row["created_at"] or "")[:16].replace("T", " ")
     markets = ", ".join(row["markets"]) if row["markets"] else "-"
-    return f"{row['label'] or row['id']}  ·  {created}  ·  {markets}"
-
-
-def _kpis_panel(run: SimulationRun):
-    kpis = run.kpis
-    period = run.inputs.get("period", {})
-
-    def fmt(value, unit, decimals=1):
-        return "-" if value is None else f"{value:,.{decimals}f} {unit}"
-
-    rows = [("Total revenue", fmt(kpis.get("revenue_total"), "EUR", 0))]
-    rows += [
-        (f"  {market}", fmt(value, "EUR", 0))
-        for market, value in kpis.get("revenue_by_market", {}).items()
-    ]
-    rows += [
-        ("Exported", fmt(kpis.get("energy_exported_MWh"), "MWh")),
-        ("Imported", fmt(kpis.get("energy_imported_MWh"), "MWh")),
-        ("Charged", fmt(kpis.get("energy_charged_MWh"), "MWh")),
-        ("Discharged", fmt(kpis.get("energy_discharged_MWh"), "MWh")),
-        ("Equivalent cycles", fmt(kpis.get("equivalent_cycles"), "", 2)),
-        ("Excess", fmt(kpis.get("excess_energy_MWh"), "MWh")),
-        ("Period", f"{period.get('start', '')[:10]} → {period.get('end', '')[:10]}"),
-        ("Optimizer", run.manifest.get("optimizer", "-")),
-    ]
-    return html.Table(
+    return html.Div(
         [
-            html.Tr([html.Td(name), html.Td(value, style={"textAlign": "right"})])
-            for name, value in rows
-        ],
-        style={"width": "100%"},
+            html.Div(row["label"] or row["id"], className="option-label"),
+            html.Div(f"{created}  ·  {markets}", className="option-meta"),
+        ]
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Browse saved powersim runs in a local dashboard.")
     parser.add_argument("--runs", default="runs", help="folder with the saved runs (default: runs)")
+    parser.add_argument("--info", default=DEFAULT_INFO, help="information text for the header")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8050)
     parser.add_argument("--debug", action="store_true", help="Dash debug mode (auto-reload)")
     args = parser.parse_args()
 
-    create_app(args.runs).run(host=args.host, port=args.port, debug=args.debug)
+    create_app(args.runs, info=args.info).run(host=args.host, port=args.port, debug=args.debug)
 
 
 if __name__ == "__main__":

@@ -46,6 +46,9 @@ Repository = "https://github.com/RiverAndres/powersim"
 where = ["."]
 include = ["powersim*"]
 
+[tool.setuptools.package-data]
+"powersim.dashboard" = ["assets/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Dash installs a pytest plugin (browser testing) that this project does not use.
