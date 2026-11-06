@@ -9,10 +9,10 @@ __all__ = [
     "IntraDay02",
     "IntraDay03",
     "AFRR",
-    "MFRR"
+    "MFRR",
     "System",
     "Photovoltaic",
-    "Battery"
-    "PerfectOptimizer"
+    "Battery",
+    "PerfectOptimizer",
     "CookBook",
 ]
