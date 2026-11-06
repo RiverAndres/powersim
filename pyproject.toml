@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "powersim"
+version = "0.1.0"
+description = "Library to study energy assets in electricity markets, applying different strategies and algorithms."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "RiverAndres", email = "riverandresf1@gmail.com" }
+]
+
+dependencies = [
+  "esios_request @ git+https://github.com/RiverAndres/esios_request.git",
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "pyomo>=6.9",
+  "highspy>=1.13",
+  "pvlib>=0.13",
+  "scipy>=1.14",
+  "matplotlib>=3.9",
+  "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.8",
+]
+
+[project.urls]
+Repository = "https://github.com/RiverAndres/powersim"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["powersim*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
