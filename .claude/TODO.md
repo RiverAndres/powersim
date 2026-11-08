@@ -43,3 +43,18 @@ perfect-foresight model already guarantees they are met.
 
 **First step when implementing:** a test with the example above (2.5 MW battery, 10 MW grid)
 that shows the band exceeding the battery power.
+
+### `max_cycles_day` exceeded in long runs (low priority)
+
+Found by the dashboard "Daily cycle limit" check (2026-11-08):
+- `y2_0001 - bess_pv - DA` (real data, 701 d, limit 1.5/day): 65 days above, max 1.87/day.
+- Synthetic "PV 30 MW + BESS 20 MW / 2 h - DA + aFRR - 2 years": 30 days above, max 1.66/day.
+
+The dashboard defines daily cycles as daily discharged energy / total battery capacity
+(`daily_cycles` in `powersim/dashboard/tabs/overview_data.py`). Either the model counts cycles
+differently (charged energy, RTE, SOC-based, a window not aligned to calendar days in UTC...)
+or the `max_cycles_day` constraint does not bind as intended.
+
+**First step:** read how `Milp_Battery` builds the cycle constraint and compute the same
+quantity from a saved run. If the definitions differ, align the dashboard check (and document
+the definition); if they match, write a failing test with a small synthetic case.
