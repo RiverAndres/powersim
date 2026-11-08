@@ -21,7 +21,9 @@
       "PowerShell(git branch *)",
       "PowerShell(git blame *)",
       "PowerShell(git rev-parse *)",
-      "PowerShell(git tag -l *)"
+      "PowerShell(git tag -l *)",
+      "ClaudeInChromeDomain(127.0.0.1:8050)",
+      "mcp__claude-in-chrome__tabs_context_mcp"
     ],
     "deny": [
       "Read(./env/**)",
@@ -38,8 +40,8 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.venv/Scripts/python.exe\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_secrets.py\"",
-            "onFailure": "block",
-            "timeout": 10
+            "timeout": 10,
+            "onFailure": "block"
           }
         ]
       }

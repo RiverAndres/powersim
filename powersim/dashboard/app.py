@@ -21,9 +21,10 @@ except ImportError as error:  # pragma: no cover - depends on the installed extr
         "The dashboard needs the 'dashboard' extra: pip install \"powersim[dashboard]\""
     ) from error
 
-from ..runs import list_runs
-from .components import load_run, status_row
+from ..runs import SimulationRun, list_runs
+from .components import badge, format_dt, load_run, option_card, side_panel
 from .tabs import TABS
+from .tabs.base import register_tab
 
 DEFAULT_INFO = (
     "Simulations of energy assets operating in electricity markets. "
@@ -37,6 +38,9 @@ def create_app(runs_dir: str | Path = "runs", info: str = DEFAULT_INFO) -> Dash:
     runs_dir = Path(runs_dir)
     app = Dash(__name__, title="powersim · runs")
 
+    # Tab callbacks only compute while their tab is shown; they need a few stores in the layout.
+    tab_stores = {tab.id: register_tab(app, tab, RUN_INPUT) for tab in TABS}
+
     app.layout = html.Div(
         [
             _header(info),
@@ -49,7 +53,11 @@ def create_app(runs_dir: str | Path = "runs", info: str = DEFAULT_INFO) -> Dash:
                         children=[
                             html.Div(id="run-status", className="status-row"),
                             *[
-                                html.Div(tab.layout(), id=f"tab-{tab.id}", className="tab-pane")
+                                html.Div(
+                                    [*tab.layout(), *tab_stores[tab.id]],
+                                    id=f"tab-{tab.id}",
+                                    className="tab-pane",
+                                )
                                 for tab in TABS
                             ],
                         ],
@@ -90,9 +98,6 @@ def create_app(runs_dir: str | Path = "runs", info: str = DEFAULT_INFO) -> Dash:
             return html.Div(f"No saved runs in {runs_dir}", className="empty")
         return status_row(load_run(path))
 
-    for tab in TABS:
-        tab.register(app, RUN_INPUT)
-
     return app
 
 
@@ -121,57 +126,46 @@ def _header(info: str):
 
 
 def _tabs_sidebar():
-    options = [
-        {
-            "label": html.Div(
-                [
-                    html.Div(tab.label, className="option-label"),
-                    html.Div(tab.description, className="option-meta"),
-                ]
-            ),
-            "value": tab.id,
-        }
-        for tab in TABS
-    ]
-    return html.Nav(
-        className="sidebar sidebar-left",
-        children=[
-            html.Div(
-                className="sidebar-head", children=[html.H4("Tools", className="sidebar-title")]
-            ),
-            dcc.RadioItems(
-                id="tab-selector", options=options, value=TABS[0].id, className="option-list"
-            ),
-        ],
+    options = [{"label": option_card(tab.label, tab.description), "value": tab.id} for tab in TABS]
+    selector = dcc.RadioItems(
+        id="tab-selector", options=options, value=TABS[0].id, className="option-list"
     )
+    return side_panel("Tools", [selector], class_name="sidebar-left")
 
 
 def _runs_sidebar(runs_dir: Path):
-    return html.Aside(
-        className="sidebar sidebar-right",
-        children=[
-            html.Div(
-                className="sidebar-head",
-                children=[
-                    html.H4("Simulations", className="sidebar-title"),
-                    html.Button("Refresh", id="refresh", className="button"),
-                ],
-            ),
+    return side_panel(
+        "Simulations",
+        [
             html.Div(str(runs_dir.resolve()), className="sidebar-path"),
             dcc.RadioItems(id="run-selector", options=[], value=None, className="option-list"),
         ],
+        actions=html.Button("Refresh", id="refresh", className="button"),
+        class_name="sidebar-right",
     )
 
 
 def _run_option_label(row):
     created = (row["created_at"] or "")[:16].replace("T", " ")
     markets = ", ".join(row["markets"]) if row["markets"] else "-"
-    return html.Div(
-        [
-            html.Div(row["label"] or row["id"], className="option-label"),
-            html.Div(f"{created}  ·  {markets}", className="option-meta"),
-        ]
+    return option_card(row["label"] or row["id"], f"{created}  ·  {markets}")
+
+
+def status_row(run: SimulationRun) -> list:
+    """Run name, period, resolution, optimizer and one badge per market."""
+    period = run.inputs.get("period", {})
+    markets = [market["type"] for market in run.inputs.get("markets", [])]
+    meta = (
+        f"{period.get('start', '')[:10]} → {period.get('end', '')[:10]}"
+        f"  ·  {period.get('n_periods', '-')} periods of {format_dt(period.get('dt_hours'))}"
+        f"  ·  {run.manifest.get('optimizer', '-')}"
     )
+    return [
+        html.Span(className="pulse"),
+        html.H2(run.label or run.id, className="run-title"),
+        html.Span(meta, className="status-meta"),
+        *[badge(market) for market in markets],
+    ]
 
 
 def main() -> None:

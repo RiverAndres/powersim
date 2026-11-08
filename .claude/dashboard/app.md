@@ -4,6 +4,19 @@ Code: `powersim/dashboard/app.py` (layout and shared callbacks), `components.py`
 `assets/style.css` (all styles). Each tab's content and its **right side panel** are described in
 the tab's own `.md`.
 
+## Audience and goals (set by the user)
+
+- **Audience**: companies evaluating the profitability of the studied plant. They do not need
+  profitability from us (they will export the simulation into their own models), but they must
+  be able to judge **whether the simulation makes sense and is worth exporting**.
+- **Long runs**: simulations can last two years (quarter-hourly ≈ 70,000 periods). Information
+  must stay clear and not go into detail unless the user looks for it (detail on demand).
+- **At a glance**: the whole simulation must be understood at first sight: **headline numbers
+  for everything**, **charts for the economic part**.
+- **Energy flows**: what the PV sells, what the battery charges (from PV and from the grid) and
+  what is sold to the grid; and the **distribution of the total energy among markets** (total
+  only: per module it is not meaningful).
+
 ## Layout description
 
 Approximate, as context:
@@ -53,4 +66,9 @@ Approximate, as context:
 ## Decisions
 
 - Tabs are modules in `powersim/dashboard/tabs/` with ids prefixed by the tab id.
+- Tab callbacks only compute while their tab is active (`register_tab` in `tabs/base.py`), so a
+  heavy tab never slows down the others.
+- UI changes are made by the `dashboard-builder` agent (`.claude/agents/dashboard-builder.md`):
+  generic components in `components.py` / `figures.py`, placement in `tabs/`; the orchestrator
+  reviews in Chrome (max 3 rounds per goal, then show the user).
 - The dashboard only reads saved runs; it never runs simulations.

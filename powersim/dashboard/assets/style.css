@@ -12,6 +12,7 @@
   --accent: #4dabf7;
   --accent-soft: rgba(77, 171, 247, 0.15);
   --positive: #69db7c;
+  --warn: #ffa94d;
   --radius: 8px;
   --header-height: 64px;
   --font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -155,7 +156,8 @@ html, body {
 
 .tab-pane { flex-direction: column; gap: 16px; }
 
-.sandbox-note {
+/* Dashed informative note (components.note) */
+.note {
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
   padding: 10px 14px;
@@ -228,7 +230,7 @@ html, body {
 .kpi-primary { border-color: var(--accent); }
 .kpi-primary .kpi-value { color: var(--accent); }
 
-/* ---------- Chart cards ---------- */
+/* ---------- Cards (components.card / chart_card) ---------- */
 
 .card {
   background: var(--card);
@@ -248,4 +250,114 @@ html, body {
 
 .card-hint { font-size: 12px; color: var(--text-faint); }
 
+/* ---------- Sections (components.section) ---------- */
+
+.section { display: flex; flex-direction: column; gap: 16px; }
+
+.section-head { display: flex; align-items: baseline; gap: 12px; }
+
+.section-title { margin: 0; font-size: 16px; font-weight: 600; }
+
+.section-hint { font-size: 12px; color: var(--text-faint); }
+
 .empty { color: var(--text-faint); padding: 40px 0; text-align: center; }
+
+/* ---------- Layout helpers ---------- */
+
+/* Side-by-side columns (components.columns); widths come in --columns. */
+.columns { display: grid; grid-template-columns: var(--columns); gap: 16px; }
+@media (max-width: 1400px) { .columns { grid-template-columns: minmax(0, 1fr); } }
+
+/* Fixed-column KPI grid (components.kpi_grid(columns=...)). */
+.kpi-grid-fixed { grid-template-columns: repeat(var(--kpi-columns), minmax(0, 1fr)); }
+@media (max-width: 1400px) {
+  .kpi-grid-fixed { grid-template-columns: repeat(var(--kpi-columns-narrow), minmax(0, 1fr)); }
+}
+
+.kpi-group { display: flex; flex-direction: column; gap: 8px; }
+
+.group-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* ---------- Info tiles (components.info_tile) ---------- */
+
+.info-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.info-tile {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  min-width: 110px;
+}
+
+.info-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+
+.info-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); white-space: nowrap; }
+
+/* ---------- Fields (components.field) ---------- */
+
+.field { display: flex; align-items: center; gap: 10px; }
+.field-label { font-size: 13px; color: var(--text-dim); }
+.field > :not(.field-label) { min-width: 260px; }
+
+/* Dash 4 core components (dropdowns, date pickers) in the dark palette. */
+body {
+  --Dash-Fill-Inverse-Strong: var(--body);
+  --Dash-Fill-Interactive-Strong: var(--accent);
+  --Dash-Fill-Interactive-Weak: var(--accent-soft);
+  --Dash-Fill-Primary-Hover: rgba(255, 255, 255, 0.05);
+  --Dash-Fill-Primary-Active: rgba(255, 255, 255, 0.08);
+  --Dash-Fill-Disabled: rgba(255, 255, 255, 0.04);
+  --Dash-Stroke-Strong: var(--border-strong);
+  --Dash-Stroke-Weak: var(--border);
+  --Dash-Text-Primary: var(--text);
+  --Dash-Text-Strong: var(--text);
+  --Dash-Text-Weak: var(--text-dim);
+  --Dash-Text-Disabled: var(--text-faint);
+}
+
+/* Vertical stack of blocks (components.stack). */
+.stack { display: flex; flex-direction: column; gap: 16px; }
+
+.card-footnote { font-size: 11px; color: var(--text-faint); margin-top: 4px; min-height: 14px; }
+
+/* ---------- Check tiles (components.check_tile) ---------- */
+
+.check {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.check-ok { border-left-color: var(--positive); }
+.check-warn { border-left-color: var(--warn); }
+
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.check-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.check-ok .check-dot { background: var(--positive); }
+.check-warn .check-dot { background: var(--warn); }
+
+.check-value { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--text); }
+.check-warn .check-value { color: var(--warn); }
+
+.check-detail { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
