@@ -38,3 +38,16 @@ def compact_text(value, unit: str = "", decimals: int = 0, digits: int = 3) -> s
     """``format_compact`` as a single string, e.g. '18.4 M€'."""
     text, unit = format_compact(value, unit, decimals, digits)
     return f"{text} {unit}".strip()
+
+
+def axis_scale(max_abs: float, unit: str) -> tuple[float, str]:
+    """Factor and unit to show values up to ``max_abs`` on an axis, e.g. (1e6, 'M€').
+
+    Scales like ``format_compact`` (from 10,000 base units on); other values keep the unit.
+    """
+    max_abs = abs(max_abs or 0.0)
+    if max_abs >= 1e4:
+        for factor, scaled_unit in _UNIT_SCALES.get(unit, []):
+            if max_abs >= factor:
+                return factor, scaled_unit
+    return 1.0, unit

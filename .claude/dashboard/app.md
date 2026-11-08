@@ -60,11 +60,16 @@ Approximate, as context:
 - Palette (CSS variables in `style.css`): body `#1a1a19`, cards and panels `#232322`, borders
   `#383835` / `#4a4a46`, text `#f0efec`, dim text `#a3a29a` / `#898781`, accent `#4dabf7`.
 - Fonts: Inter (text), IBM Plex Mono (numbers in KPIs and paths). Radius 8 px.
-- Plotly figures: transparent background, same palette, horizontal legend on top
+- Plotly figures: transparent background, same palette, horizontal legend below the plot
   (`figures.apply_theme`). Series colors from `powersim/visualization/styles.py`.
 
 ## Decisions
 
+- Charts: legends below the plot; one opaque hover style for every figure (`HOVER_LABEL`;
+  CSS forces `fill-opacity: 1` because plotly draws Sankey hover boxes at 0.65); plotly toolbar
+  only on hover via CSS (`displayModeBar: "hover"` is coerced to always by dcc.Graph); period
+  axes get one tick per bar up to 12 periods, otherwise every N periods (max 8), horizontal,
+  "Jan<br>2025"; € and MWh axes scaled to k€/M€, GWh.
 - Tabs are modules in `powersim/dashboard/tabs/` with ids prefixed by the tab id.
 - Tab callbacks only compute while their tab is active (`register_tab` in `tabs/base.py`), so a
   heavy tab never slows down the others.

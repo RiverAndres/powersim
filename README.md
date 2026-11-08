@@ -141,7 +141,9 @@ run.timeseries_wide()                            # one column per variable
 A local [Dash](https://dash.plotly.com/) app to explore saved runs. Pick a tool on the left
 and a run on the right:
 
-- **Visualization**: the run's KPIs and operation charts (the same charts as `plot_operation()`).
+- **Visualization**: overview of a run, designed for long simulations: plant, headline numbers,
+  sanity checks, revenue over time and by stream, energy flows (Sankey, by market, over time),
+  battery usage and a 7-day operation detail on demand.
 - **Sandbox**: experimental views, still being designed.
 
 It only reads saved runs.

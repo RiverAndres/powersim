@@ -177,11 +177,14 @@ html, body {
   box-shadow: 0 0 0 4px rgba(105, 219, 124, 0.15);
 }
 
-.run-title { margin: 0; font-size: 20px; font-weight: 600; }
+.run-title { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.2; }
 
 .status-meta { color: var(--text-faint); font-size: 13px; }
 
 .badge {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.4;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -200,11 +203,17 @@ html, body {
   gap: 12px;
 }
 
+/* Tiles in a row share the row height (grid stretch); every text line stays on one line
+   and is cut with an ellipsis (full text in the tooltip). */
 .kpi {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 16px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .kpi-label {
@@ -212,20 +221,32 @@ html, body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-faint);
-  margin-bottom: 6px;
+  margin-bottom: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .kpi-value {
   font-family: var(--font-mono);
   font-size: 22px;
   font-weight: 600;
+  line-height: 1.2;
   color: var(--text);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpi-unit { font-size: 12px; font-weight: 400; color: var(--text-dim); margin-left: 4px; }
 
-.kpi-sub { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+.kpi-sub {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 .kpi-primary { border-color: var(--accent); }
 .kpi-primary .kpi-value { color: var(--accent); }
@@ -243,12 +264,22 @@ html, body {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
 }
 
-.card-title { margin: 0; font-size: 14px; font-weight: 600; }
+.card-title { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.3; flex-shrink: 0; }
 
-.card-hint { font-size: 12px; color: var(--text-faint); }
+/* Long hints are cut with an ellipsis (full text in the tooltip). */
+.card-hint {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-faint);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 /* ---------- Sections (components.section) ---------- */
 
@@ -284,9 +315,11 @@ html, body {
 
 /* ---------- Info tiles (components.info_tile) ---------- */
 
+/* Tiles grow to fill each row, so a wrapped row stays aligned with the first one. */
 .info-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .info-tile {
+  flex: 1 1 auto;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -300,6 +333,7 @@ html, body {
   text-transform: uppercase;
   color: var(--text-faint);
   margin-bottom: 2px;
+  white-space: nowrap;
 }
 
 .info-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); white-space: nowrap; }
@@ -339,6 +373,10 @@ body {
   border-left: 3px solid var(--accent);
   border-radius: var(--radius);
   padding: 10px 14px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .check-ok { border-left-color: var(--positive); }
 .check-warn { border-left-color: var(--warn); }
@@ -351,13 +389,42 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-faint);
-  margin-bottom: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-.check-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.check-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--accent); }
 .check-ok .check-dot { background: var(--positive); }
 .check-warn .check-dot { background: var(--warn); }
 
-.check-value { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--text); }
+.check-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .check-warn .check-value { color: var(--warn); }
 
-.check-detail { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+.check-detail {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Elements hidden by callbacks (the hidden property) stay hidden whatever their display. */
+[hidden] { display: none !important; }
+
+/* ---------- Plotly overrides ---------- */
+
+/* Opaque hover boxes: plotly draws some (e.g. sankey links) at 65 % opacity, so the colour
+   underneath shows through the dark tooltip. */
+.js-plotly-plot .hoverlayer .hovertext path { fill-opacity: 1 !important; }
+
+/* Toolbar only while hovering the graph (displayModeBar "hover" does not reach plotly). */
+.js-plotly-plot .plotly .modebar { opacity: 0 !important; transition: opacity 0.15s; }
+.js-plotly-plot:hover .plotly .modebar { opacity: 1 !important; }
