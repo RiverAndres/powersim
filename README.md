@@ -159,20 +159,28 @@ Custom post-solve tasks can be registered with `powersim.runs.register(PostSolve
 
 ### Dashboard
 
-A local [Dash](https://dash.plotly.com/) app to explore saved runs. Pick a tool on the left
-and a run on the right:
+The results of saved runs can be viewed in a local [Dash](https://dash.plotly.com/) app. It only
+reads the runs folder; it never runs simulations.
 
-- **Visualization**: overview of a run, designed for long simulations: plant, headline numbers,
-  sanity checks, revenue over time and by stream, energy flows (Sankey, by market, over time),
-  battery usage and a 7-day operation detail on demand.
-- **Sandbox**: experimental views, still being designed (today: the derived indicators).
+1. Install the optional `dashboard` extra:
 
-It only reads saved runs.
+   ```bash
+   pip install "powersim[dashboard] @ git+https://github.com/RiverAndres/powersim.git"
+   # or, from a local clone:
+   pip install -e ".[dashboard]"
+   ```
 
-```bash
-pip install -e ".[dashboard]"
-powersim-dashboard --runs runs      # then open http://127.0.0.1:8050
-```
+2. Start it, pointing to the folder where the runs were saved (`runs` by default):
+
+   ```bash
+   powersim-dashboard --runs runs
+   ```
+
+3. Open http://127.0.0.1:8050 in a browser and pick a run in the right-hand panel. Runs saved
+   while the app is open appear after pressing **Refresh**.
+
+Options: `--port` (default 8050), `--host` (default 127.0.0.1, local only), `--debug` (Dash
+debug mode with auto-reload). Stop it with `Ctrl+C`.
 
 ## Core concepts
 
