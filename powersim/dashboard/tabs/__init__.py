@@ -4,9 +4,9 @@
 To add a tab: create the module, define ``TAB``, append it to ``TABS`` and write its ``.md``.
 """
 
-from . import sandbox, visualization
+from . import developer, sandbox, visualization
 from .base import Tab
 
-TABS: list[Tab] = [visualization.TAB, sandbox.TAB]
+TABS: list[Tab] = [visualization.TAB, sandbox.TAB, developer.TAB]
 
 __all__ = ["TABS", "Tab"]

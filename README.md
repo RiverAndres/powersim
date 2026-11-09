@@ -124,6 +124,7 @@ runs/2026-11-06T15-30-00_bess-50-mw-2-h_a1b2c3/
   kpis.json            revenues (total and per market), energies, equivalent cycles...
   timeseries.parquet   operation, long format (time, variable, value)
   market_data.parquet  market input data used (time, market, dataset, value)
+  derived/             post-solve data: indicators.json + indicators__<table>.parquet
 ```
 
 Saved runs can be loaded and listed:
@@ -136,6 +137,26 @@ run = SimulationRun.load(catalog.loc[0, "path"])
 run.timeseries_wide()                            # one column per variable
 ```
 
+### Derived indicators (post-solve)
+
+After saving, `run.save()` computes **derived indicators** from the run files only (TBn spread
+capture, realized spread, value per cycle, revenue concentration, grid connection use, aFRR
+commitment, PV capture rate, price ≤ 0 exposure, battery usage...) and stores them in
+`derived/`. They can be added or refreshed for runs saved earlier, without re-simulating:
+
+```python
+from powersim import update_runs, load_derived
+
+update_runs("runs")                                   # only runs missing or outdated
+load_derived(run.path, "indicators").kpis["spread"]   # {"tbn_capture": 0.97, ...}
+```
+
+```bash
+powersim-post-solve --runs runs [--force]
+```
+
+Custom post-solve tasks can be registered with `powersim.runs.register(PostSolveTask(...))`.
+
 ### Dashboard
 
 A local [Dash](https://dash.plotly.com/) app to explore saved runs. Pick a tool on the left
@@ -144,7 +165,7 @@ and a run on the right:
 - **Visualization**: overview of a run, designed for long simulations: plant, headline numbers,
   sanity checks, revenue over time and by stream, energy flows (Sankey, by market, over time),
   battery usage and a 7-day operation detail on demand.
-- **Sandbox**: experimental views, still being designed.
+- **Sandbox**: experimental views, still being designed (today: the derived indicators).
 
 It only reads saved runs.
 

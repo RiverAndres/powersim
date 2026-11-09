@@ -39,6 +39,12 @@ Strict separation between **what is studied** (domain) and **how it is optimized
   optimizer-independent export of one simulation, saved as a folder in `runs/` (git-ignored):
   JSON (manifest, inputs, solver, kpis) + Parquet in long format (timeseries, market_data).
   Changing what a run stores means bumping `SCHEMA_VERSION` in `powersim/runs/run.py`.
+  Derived data (indicators...) is computed **after** solving from the run files only, by
+  post-solve tasks (`powersim/runs/post_solve.py`, registered `PostSolveTask(name, version)`),
+  stored in `<run>/derived/` (`<task>.json` + `<task>__<table>.parquet`). `save()` runs them;
+  `update_runs()` / `powersim-post-solve` add or refresh them for old runs without re-simulating.
+  When a formula in `powersim/runs/indicators.py` changes, bump the task `version` (not
+  `SCHEMA_VERSION`). `powersim/runs` must never import `powersim/dashboard`.
 - Dashboard: `powersim/dashboard/` (optional extra `dashboard`; command `powersim-dashboard`).
   It **only reads saved runs**, never runs simulations; figures pick series by variable prefix
   (`p_`, `P_sell_`, `Band_up_`...), not by market name, so keep those prefixes for new markets.
@@ -48,6 +54,8 @@ Strict separation between **what is studied** (domain) and **how it is optimized
   layout description, right side panel, decisions); the header, left panel and shared style are
   in `.claude/dashboard/app.md`. Read them before changing the dashboard and keep them updated. New views are
   tried in the **Sandbox** tab first and moved to their tab only when the user approves them.
+  Checks that validate the simulation/optimizer (balance, model limits) go to the **Developer**
+  tab (user-only, for debugging), never to the analysis tabs.
 - `powersim/cook_book/`: high-level recipes (sizing, reports).
 - `powersim/utils/cache.py`: disk cache (`%TEMP%/powersim_cache`).
 
@@ -98,6 +106,8 @@ domain name (`"AFRR"`).
 - `MFRR` is incomplete: `get_info` downloads indicator `""` and `Milp_MFRR` does not define
   `Market_output_*`. Do not use it until it is finished.
 - Known bugs are covered by tests marked `xfail(strict=True)`; when fixing one, remove its marker.
+- `.claude/ROADMAP.md` holds the user's work order (dashboard → TODO/esios_request → tests →
+  optimizers + price forecasting → UI) and the later SaaS plan: read it when planning work.
 - `.claude/TODO.md` holds analysed-but-postponed work (e.g. `PerfectOptimizer` is under-constrained:
   aFRR band not limited by battery power). Read it before working on the optimizers.
 

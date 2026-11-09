@@ -19,7 +19,9 @@ def format_compact(value, unit: str = "", decimals: int = 1, digits: int = 3) ->
     if value is None:
         return "-", unit
     if abs(value) < 1e4:
-        return f"{value:,.{decimals}f}", unit
+        text = f"{value:,.{decimals}f}"
+        # Tiny negatives (solver noise such as -1e-12) round to "-0": drop the sign.
+        return (text[1:] if text.startswith("-") and not text.strip("-0.,") else text), unit
     for factor, scaled_unit in _UNIT_SCALES.get(unit, []):
         if abs(value) >= factor:
             return _significant(value / factor, digits), scaled_unit

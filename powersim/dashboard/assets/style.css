@@ -298,6 +298,8 @@ html, body {
 /* Side-by-side columns (components.columns); widths come in --columns. */
 .columns { display: grid; grid-template-columns: var(--columns); gap: 16px; }
 @media (max-width: 1400px) { .columns { grid-template-columns: minmax(0, 1fr); } }
+/* Columns at their natural height (columns(align_start=True)): no stretched half-empty card. */
+.columns-start { align-items: start; }
 
 /* Fixed-column KPI grid (components.kpi_grid(columns=...)). */
 .kpi-grid-fixed { grid-template-columns: repeat(var(--kpi-columns), minmax(0, 1fr)); }
@@ -312,31 +314,6 @@ html, body {
   font-weight: 600;
   color: var(--text-dim);
 }
-
-/* ---------- Info tiles (components.info_tile) ---------- */
-
-/* Tiles grow to fill each row, so a wrapped row stays aligned with the first one. */
-.info-row { display: flex; flex-wrap: wrap; gap: 8px; }
-
-.info-tile {
-  flex: 1 1 auto;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px 12px;
-  min-width: 110px;
-}
-
-.info-label {
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin-bottom: 2px;
-  white-space: nowrap;
-}
-
-.info-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); white-space: nowrap; }
 
 /* ---------- Fields (components.field) ---------- */
 
@@ -428,3 +405,183 @@ body {
 /* Toolbar only while hovering the graph (displayModeBar "hover" does not reach plotly). */
 .js-plotly-plot .plotly .modebar { opacity: 0 !important; transition: opacity 0.15s; }
 .js-plotly-plot:hover .plotly .modebar { opacity: 1 !important; }
+
+/* Tiles that link to a section (components.link_tile): look like the tile, fill its cell. */
+.tile-link { display: flex; color: inherit; text-decoration: none; min-width: 0; }
+.tile-link > * { flex: 1; }
+.tile-link:hover > * { border-color: var(--text-faint); }
+.section { scroll-margin-top: 16px; }
+
+/* ---------- Compact data blocks (hero_strip, stat_list, check_list, data_table) ---------- */
+
+/* Big numbers inline, separated by thin vertical dividers. */
+.hero-strip { display: flex; flex-wrap: wrap; padding: 14px 0; }
+.hero-item {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hero-item + .hero-item { border-left: 1px solid var(--border); }
+.hero-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hero-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.hero-unit { font-size: 14px; font-weight: 400; color: var(--text-dim); margin-left: 6px; }
+.hero-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hero-primary .hero-value { color: var(--accent); }
+
+/* Rows "label ...... value unit", flowing in --stat-columns columns. */
+/* Rows of the same line share its height (grid stretch), so the
+   separators line up across the columns. */
+.stat-list {
+  display: grid;
+  grid-template-columns: repeat(var(--stat-columns), minmax(0, 1fr));
+  align-items: stretch;
+  column-gap: 28px;
+}
+/* columns > 1: filled column by column, --stat-rows rows per column; rows on the same line
+   still share its height. */
+.stat-list-flow { grid-auto-flow: column; grid-template-rows: repeat(var(--stat-rows), auto); }
+@media (max-width: 1400px) {
+  .stat-list, .stat-list-flow {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-flow: row;
+  }
+}
+.status-summary { font-size: 12px; color: var(--text-faint); margin-bottom: 6px; }
+.status-count { font-weight: 600; }
+.status-warn { color: var(--warn); }
+.stat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.stat-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  align-self: center;
+}
+.stat-ok .stat-dot { background: var(--positive); }
+.stat-warn .stat-dot { background: var(--warn); }
+.stat-text { flex: 1 1 auto; min-width: 0; }
+.stat-label { font-size: 13px; color: var(--text-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.stat-sub { font-size: 11px; color: var(--text-faint); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-unit { font-size: 11px; font-weight: 400; color: var(--text-dim); margin-left: 4px; }
+.stat-primary .stat-value { color: var(--accent); }
+.stat-primary .stat-label { color: var(--text); }
+.stat-warn .stat-value { color: var(--warn); }
+
+/* Compact table: dim header, thin separators, numbers right-aligned in mono. */
+.table-scroll { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid var(--border-strong);
+  white-space: nowrap;
+}
+.data-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table .table-label { text-align: left; color: var(--text); white-space: nowrap; }
+/* Numeric columns hug their content; the label column takes the extra width. */
+.data-table .table-num { text-align: right; width: 1%; white-space: nowrap; padding-left: 24px; }
+.table-value { font-family: var(--font-mono); font-weight: 600; white-space: nowrap; }
+.table-sub { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
+.table-ok { color: var(--positive); }
+.table-warn { color: var(--warn); }
+.table-info { color: var(--accent); }
+.table-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 8px;
+  vertical-align: -1px;
+}
+
+/* ---------- Specification card (components.spec_card) ---------- */
+
+/* Groups side by side with a divider on their left; the first group of every line hides its
+   divider under the card edge (negative margin + overflow hidden), so wrapped lines start
+   clean. */
+.spec-card { display: flex; flex-wrap: wrap; row-gap: 14px; padding: 12px 0; overflow: hidden; }
+/* Groups take their content width (then share the free space), so values are not cut while
+   there is room; the ellipsis is only a last resort on narrow screens. */
+.spec-group {
+  flex: 1 1 auto;
+  min-width: 160px;
+  padding: 0 18px;
+  margin-left: -1px;
+  border-left: 1px solid var(--border);
+}
+.spec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; min-width: 0; }
+.spec-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.spec-title { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.spec-subtitle {
+  font-size: 11px;
+  color: var(--text-faint);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  min-height: 24px;
+  padding: 3px 0;
+}
+.spec-row-indent { min-height: 20px; padding: 1px 0 1px 16px; }
+.spec-row-indent .spec-label, .spec-row-indent .spec-value { font-size: 11px; color: var(--text-faint); }
+.spec-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+.spec-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

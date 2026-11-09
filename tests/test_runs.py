@@ -50,7 +50,7 @@ def test_save_and_load_round_trip(run_fixture, request, tmp_path):
     run = request.getfixturevalue(run_fixture)
     path = run.save(tmp_path)
 
-    assert {p.name for p in path.iterdir()} == RUN_FILES
+    assert {p.name for p in path.iterdir()} == RUN_FILES | {"derived"}
     assert_same_run(SimulationRun.load(path), run)
 
 

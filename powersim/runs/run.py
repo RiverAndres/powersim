@@ -106,8 +106,12 @@ class SimulationRun:
         )
 
     # ------------------------------------------------------------------ disk
-    def save(self, root: str | Path = DEFAULT_RUNS_DIR) -> Path:
-        """Save the run in ``root/<id>/`` and return that folder. Never overwrites a run."""
+    def save(self, root: str | Path = DEFAULT_RUNS_DIR, post_solve: bool = True) -> Path:
+        """Save the run in ``root/<id>/`` and return that folder. Never overwrites a run.
+
+        With ``post_solve`` (default) the registered post-solve tasks (derived indicators...)
+        are computed and stored in ``derived/``; see :mod:`powersim.runs.post_solve`.
+        """
         path = Path(root) / self.manifest["id"]
         path.mkdir(parents=True, exist_ok=False)
 
@@ -124,7 +128,24 @@ class SimulationRun:
         self.market_data.to_parquet(path / MARKET_DATA_FILE, index=False)
 
         self.path = path
+        if post_solve:
+            self.post_solve()
         return path
+
+    def post_solve(self, names: list[str] | None = None, force: bool = False) -> dict[str, str]:
+        """Compute (and store, if saved) the post-solve tasks. Returns ``{task: status}``."""
+        from .post_solve import run_post_solve
+
+        return run_post_solve(self, names, force)
+
+    def derived(self, name: str = "indicators"):
+        """Stored output (:class:`~powersim.runs.post_solve.Derived`) of a post-solve task.
+
+        None if the run is not saved or the task was never run (see :meth:`post_solve`).
+        """
+        from .post_solve import load_derived
+
+        return load_derived(self.path, name) if self.path is not None else None
 
     @classmethod
     def load(cls, path: str | Path) -> "SimulationRun":

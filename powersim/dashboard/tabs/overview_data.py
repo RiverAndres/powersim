@@ -7,8 +7,10 @@ variable). Series are selected by variable prefix, never by market name.
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
+from ...runs._series import energy, period_hours, plant_ratings
 from ..formatting import compact_text
 
 REVENUE_PREFIX = "B_benefit_"
@@ -114,12 +116,16 @@ def partial_periods(index: pd.DatetimeIndex, rule: PeriodRule) -> pd.Series:
     return pd.Series(notes, dtype=str)
 
 
-def period_hours(index: pd.DatetimeIndex) -> pd.Series:
-    """Length of each period in hours (the last one repeats the previous)."""
-    if len(index) < 2:
-        return pd.Series(1.0, index=index)
-    hours = pd.Series(index, index=index).diff().shift(-1).dt.total_seconds() / 3600
-    return hours.fillna(hours.iloc[-2])
+def day_coverage(days: pd.DatetimeIndex, rule: PeriodRule) -> pd.Series:
+    """Per aggregated period, the share (0-1) of its calendar days present in ``days`` (one
+    entry per day, e.g. a daily table index)."""
+    if len(days) == 0:
+        return pd.Series(dtype=float)
+    counts = aggregate(pd.DataFrame({"days": 1.0}, index=days), rule)["days"]
+    return pd.Series(
+        {start: n / ((start + rule.offset) - start).days for start, n in counts.items()},
+        dtype=float,
+    )
 
 
 def period_days(period: dict) -> float | None:
@@ -137,16 +143,6 @@ def period_days(period: dict) -> float | None:
 # ---------- Plant ----------
 
 
-def plant_ratings(inputs: dict) -> dict:
-    """Rated PV peak power (MW), battery power (MW) and capacity (MWh); None when unknown."""
-    batteries = inputs.get("batteries", [])
-    return {
-        "pv_peak": _sum_known(g.get("peak_power") for g in inputs.get("generators", [])),
-        "battery_power": _sum_known(_battery_power(b) for b in batteries),
-        "battery_capacity": _sum_known(b.get("capacity") for b in batteries),
-    }
-
-
 def has_pv(inputs: dict, data: pd.DataFrame) -> bool:
     """The run has generation: a generator in the inputs or any non-zero ``P_generation``."""
     generating = "P_generation" in data and bool((data["P_generation"].abs() > 1e-9).any())
@@ -155,13 +151,6 @@ def has_pv(inputs: dict, data: pd.DataFrame) -> bool:
 
 def has_battery(inputs: dict) -> bool:
     return bool(inputs.get("batteries"))
-
-
-def energy(data: pd.DataFrame, variable: str) -> float:
-    """Absolute energy (MWh) of a power variable over the run (power × period length)."""
-    if variable not in data:
-        return 0.0
-    return abs(float((data[variable] * period_hours(data.index)).sum()))
 
 
 # ---------- Prices and revenues ----------
@@ -338,16 +327,27 @@ def run_checks(inputs: dict, kpis: dict, data: pd.DataFrame) -> list[dict]:
     checks.append(check_export(data, kpis.get("energy_exported_MWh")))
     if has_pv(inputs, data):
         checks.append(check_curtailment(kpis.get("excess_energy_MWh"), pv))
-    for item in captured_prices(data):
-        if item["direction"] == "sell" and item["market_avg"] is not None:
-            checks.append(
-                {
-                    "label": f"{item['market']} captured vs market",
-                    "value": f"{item['price'] - item['market_avg']:+,.1f} €/MWh",
-                    "status": "info",
-                    "detail": f"sell {item['price']:,.1f} vs avg {item['market_avg']:,.1f} €/MWh",
-                }
-            )
+    return checks
+
+
+def indicator_checks(negative_prices: dict | None, exported_mwh) -> list[dict]:
+    """Checks from derived indicators (``Indicator.kpis`` of ``negative_prices``, ``None`` when
+    the indicator is not available), as ``check_list`` rows."""
+    checks = []
+    if negative_prices is not None:
+        mwh = negative_prices.get("export_at_nonpositive_mwh")
+        share = mwh / exported_mwh if mwh is not None and exported_mwh else None
+        detail = [f"{share:.1%} of exported energy"] if share is not None else []
+        if negative_prices.get("price_market"):
+            detail.append(f"{negative_prices['price_market']} price")
+        checks.append(
+            {
+                "label": "Exports at price ≤ 0",
+                "value": compact_text(mwh, "MWh") if mwh is not None else None,
+                "status": "info",
+                "detail": " · ".join(detail) or None,
+            }
+        )
     return checks
 
 
@@ -433,6 +433,35 @@ def check_curtailment(excess: float | None, pv: float) -> dict:
     }
 
 
+def battery_duration(data: pd.DataFrame, power: float | None, points: int = 201) -> pd.DataFrame:
+    """Battery net power duration curve: net = |discharge| − |charge| as % of the total
+    battery ``power`` (MW; discharge +, charge −), sorted from highest, time-weighted by the
+    period length. ``points`` values over the share of time (index ``time_share``, 0-100 %),
+    column ``net_percent``. Empty without a power rating or storage series."""
+    if not power or not {"P_storage_charge", "P_storage_discharge"} & set(data.columns):
+        return pd.DataFrame(columns=["net_percent"])
+    zero = pd.Series(0.0, index=data.index)
+    net = data.get("P_storage_discharge", zero).abs() - data.get("P_storage_charge", zero).abs()
+    percent = (net / power * 100).to_numpy()
+    dt = period_hours(data.index).to_numpy()
+    order = np.argsort(-percent)
+    cumulative = np.cumsum(dt[order]) / dt.sum()
+    share = np.linspace(0, 1, points)
+    return pd.DataFrame(
+        {"net_percent": np.interp(share, cumulative, percent[order])},
+        index=pd.Index(share * 100, name="time_share"),
+    )
+
+
+def curves_differ(a: pd.DataFrame, b: pd.DataFrame, tolerance: float = 5.0) -> bool:
+    """Whether two duration curves (``net_percent`` over ``time_share``, both in %) differ by
+    at least ``tolerance`` percentage points somewhere (compared on the points of ``a``)."""
+    if a.empty or b.empty:
+        return True
+    other = np.interp(a.index.to_numpy(float), b.index.to_numpy(float), b["net_percent"].to_numpy())
+    return bool(np.max(np.abs(a["net_percent"].to_numpy() - other)) >= tolerance)
+
+
 # ---------- Detail ----------
 
 
@@ -488,16 +517,3 @@ def _negligible(value: float, reference: float) -> float:
 
 def _abs_total(data: pd.DataFrame, variable: str) -> float:
     return float(data[variable].abs().sum()) if variable in data else 0.0
-
-
-def _battery_power(battery: dict):
-    if battery.get("max_power_output") is not None:
-        return battery["max_power_output"]
-    if battery.get("capacity") is not None and battery.get("c_rate") is not None:
-        return battery["capacity"] * battery["c_rate"]
-    return None
-
-
-def _sum_known(values):
-    known = [v for v in values if v is not None]
-    return sum(known) if known else None

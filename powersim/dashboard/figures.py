@@ -4,8 +4,9 @@ Builders take pandas objects (one series per column, time on the index) and know
 runs or markets: the tabs choose which variables to plot and how to aggregate them. Series
 colors default to ``series_color(column)``; pass ``colors`` to override them.
 
-Single-row figures: ``line_figure``, ``area_figure``, ``stacked_bar_figure``, ``hbar_figure``,
-``histogram_figure``, ``heatmap_figure``. ``rows_figure`` stacks several of them as rows sharing
+Single-row figures: ``line_figure``, ``area_figure``,
+``stacked_bar_figure``, ``hbar_figure``, ``histogram_figure`` (raw values),
+``binned_histogram_figure`` (pre-computed bins), ``scatter_figure``, ``heatmap_figure``. ``rows_figure`` stacks several of them as rows sharing
 the x axis. ``sankey_figure`` draws flows between nodes.
 
 Units: pass ``unit`` ("MW", "MWh", "€", "€/MWh"...) so hovers show values with their unit and
@@ -43,6 +44,8 @@ _LAYOUT = {
 # Legend below the plot area (never under the toolbar, which sits at the top right): its top
 # edge this many px below the plot, leaving room for the x tick labels.
 _LEGEND_GAP_PX = 45
+_X_TITLE_PX = 20  # extra room below the ticks for an x axis title
+_LEGEND_ROW_PX = 25  # one row of legend items
 _DIM = "#a3a29a"
 # Period axes: up to this many periods get one tick each; with more, one tick every few
 # periods (2, 3, 4, 6, 12...) so that there are at most MAX_PERIOD_TICKS_THINNED ticks.
@@ -67,20 +70,37 @@ def line_figure(
     height: int = 400,
     labels: dict[str, str] | None = None,
     unit: str = "",
+    x_title: str | None = None,
+    dashed: Iterable[str] = (),
+    reference_lines: Iterable[float] = (),
 ) -> go.Figure:
-    """One line per column of ``frame``. ``labels`` renames series (raw name kept in hover)."""
+    """One line per column of ``frame``. ``labels`` renames series (raw name kept in hover);
+    columns in ``dashed`` are drawn dashed (e.g. a reference line). ``reference_lines`` adds
+    dotted horizontal lines at those y values (e.g. limits), in the y units of ``frame``. With
+    ``unit="%"`` values are fractions shown as percentages (axis and hover)."""
     fig = go.Figure()
+    dashed = set(dashed)
     for column in frame.columns:
+        line = {"color": _pick(colors, column), "width": width}
+        if column in dashed:
+            line |= {"dash": "dash", "width": 1}
         fig.add_trace(
             go.Scatter(
                 x=frame.index,
                 y=frame[column],
                 mode="lines",
-                line={"color": _pick(colors, column), "width": width},
+                line=line,
                 **_naming(column, labels, unit),
             )
         )
-    return _finish(fig, y_title, height)
+    if x_title:
+        fig.update_xaxes(title_text=x_title)
+    if unit == "%":
+        fig.update_yaxes(tickformat=".0%")
+    fig = _finish(fig, y_title, height)
+    for y in reference_lines:
+        fig.add_hline(y=y, line={"color": _DIM, "width": 1, "dash": "dot"})
+    return fig
 
 
 def area_figure(
@@ -132,6 +152,7 @@ def stacked_bar_figure(
     unit: str = "",
     x_format: str | None = None,
     partial: pd.Series | None = None,
+    grouped: bool = False,
 ) -> go.Figure:
     """One bar series per column of ``frame``, stacked (negatives stack downwards).
 
@@ -139,6 +160,7 @@ def stacked_bar_figure(
       is given) and hovers show compact values.
     - ``x_format`` (strftime-style, e.g. "%b %Y") formats the time ticks and the hover header;
       ticks follow ``_period_ticks`` (one per bar, or every few bars, horizontal labels).
+    - ``grouped=True`` puts the series side by side instead of stacking them.
     - ``partial``: per bar, a note ("partial · 1 of 30 days") for periods not fully covered,
       or "" for complete ones. Partial bars are drawn translucent and the note is added to the
       hover.
@@ -164,7 +186,7 @@ def stacked_bar_figure(
                 hovertemplate="%{customdata}" if unit or notes.any() else None,
             )
         )
-    fig.update_layout(barmode="relative", bargap=BAR_GAP)
+    fig.update_layout(barmode="group" if grouped else "relative", bargap=BAR_GAP)
     if x_format:
         fig.update_xaxes(hoverformat=x_format)
         _period_ticks(fig, frame.index, x_format)
@@ -235,6 +257,7 @@ def sankey_figure(
     show_totals: bool = False,
     positions: dict[str, tuple[float, float]] | None = None,
     height: int = 400,
+    columns: dict[str, float] | None = None,
 ) -> go.Figure:
     """Flows between nodes: ``links`` are ``(source, target, value)`` with node labels.
 
@@ -245,6 +268,8 @@ def sankey_figure(
       label, e.g. "PV · 89.8 GWh".
     - ``positions`` fixes ``(x, y)`` of nodes (0-1, x left to right, y top to bottom), e.g. to
       keep small nodes and their labels apart.
+    - ``columns`` gives only the x of each node; y is computed from the flows so every column
+      fits in the plot whatever the node sizes (see ``stacked_node_positions``).
     - Hovers: link "PV → Grid export / 50.2 GWh · 56 % of PV"; node "PV / in 0 · out 89.8 GWh".
     """
     kept = [link for link in links if link[2] and abs(link[2]) > 1e-9]
@@ -277,10 +302,15 @@ def sankey_figure(
     labels = list(used)
     if show_totals:
         labels = [f"{n} · {compact_text(max(inflow[n], outflow[n]), unit)}" for n in used]
+    pad = SANKEY_NODE_PAD
+    if columns and not positions:
+        totals = {n: max(inflow[n], outflow[n]) for n in used}
+        plot_height = height - SANKEY_MARGIN["t"] - SANKEY_MARGIN["b"]
+        positions = stacked_node_positions(totals, columns, pad / plot_height)
     node = {
         "label": labels,
         "color": node_color,
-        "pad": 18,
+        "pad": pad,
         "thickness": 14,
         "line": {"width": 0},
         "customdata": [f"{n}<br>{sides(n)}" for n in used],
@@ -315,8 +345,48 @@ def sankey_figure(
     fig = apply_theme(fig, height=height)
     # Labels of the right-most nodes are drawn on their left; the right margin only has to fit
     # the node bars themselves.
-    fig.update_layout(hovermode="closest", margin={"t": 20, "b": 20, "l": 20, "r": 40})
+    fig.update_layout(hovermode="closest", margin=SANKEY_MARGIN)
     return fig
+
+
+SANKEY_NODE_PAD = 30  # px between nodes of a column (keeps the labels of small nodes apart)
+SANKEY_MARGIN = {"t": 20, "b": 20, "l": 20, "r": 40}
+
+
+def stacked_node_positions(
+    totals: dict[str, float], columns: dict[str, float | tuple[float, str]], pad: float
+) -> dict[str, tuple[float, float]]:
+    """``(x, y)`` of Sankey nodes so that every column fits in the plot.
+
+    ``totals``: size of each node (largest of inflow and outflow), in the order the nodes are
+    stacked top to bottom; ``columns``: x of each node, or ``(x, stack)`` to stack nodes with
+    different x together (e.g. small loss nodes under the export node); nodes without one are
+    left out. ``pad``: gap between nodes as a fraction of the plot height. Like plotly, node
+    heights share one scale, set by the stack that needs the most room; each stack is laid
+    out with ``pad`` gaps and centred vertically. y is the node centre (0 top, 1 bottom).
+    """
+    stacks: dict[object, list[str]] = {}
+    for node in totals:
+        if node in columns:
+            column = columns[node]
+            stacks.setdefault(column[1] if isinstance(column, tuple) else column, []).append(node)
+    if not stacks:
+        return {}
+    scale = min(
+        (1 - pad * (len(nodes) - 1)) / (sum(totals[n] for n in nodes) or 1.0)
+        for nodes in stacks.values()
+    )
+    positions = {}
+    for nodes in stacks.values():
+        heights = [totals[n] * scale for n in nodes]
+        top = (1 - sum(heights) - pad * (len(nodes) - 1)) / 2
+        for node, h in zip(nodes, heights, strict=True):
+            column = columns[node]
+            x = column[0] if isinstance(column, tuple) else column
+            # plotly snaps nodes that touch the edges; keep centres strictly inside (0, 1)
+            positions[node] = (x, min(max(top + h / 2, 0.001), 0.999))
+            top += h + pad
+    return positions
 
 
 def histogram_figure(
@@ -336,7 +406,13 @@ def histogram_figure(
     ``highlight_above`` draws the values above it in ``highlight_color`` (same bins, stacked).
     The hover reads "<bin range>: <count> <y_title>".
     """
-    bins = {"start": 0.0, "size": bin_size} if bin_size else None
+    if not bin_size and len(values):
+        # Explicit "nice" bins (about 30), so the count axis can use integer ticks.
+        bin_size = _nice_step(float(values.max() - values.min()) / 30)
+        start = math.floor(float(values.min()) / bin_size) * bin_size
+    else:
+        start = 0.0
+    bins = {"start": start, "size": bin_size} if bin_size else None
     above = pd.Series(False, index=values.index)
     if highlight_above is not None:
         above = values > highlight_above
@@ -356,26 +432,143 @@ def histogram_figure(
     if x_title:
         fig.update_xaxes(title_text=x_title)
     # Counts are integers: integer ticks only, about five of them.
-    largest = _largest_bin(values, bin_size)
+    largest = _largest_bin(values - start, bin_size)
     fig.update_yaxes(tick0=0, dtick=max(1, math.ceil(largest / 5)), rangemode="tozero")
     fig = _finish(fig, y_title, height)
     fig.update_layout(hovermode="closest", bargap=0.05, barmode="stack")
-    if marker is not None:  # after the theme, which restyles annotations as subplot titles
-        fig.add_vline(x=marker, line={"color": highlight_color, "width": 1.5, "dash": "dash"})
-        if marker_label:
-            # Inside the plot, just right of the line and below the top edge (the toolbar).
-            fig.add_annotation(
-                x=marker,
-                y=0.96,
-                xref="x",
-                yref="paper",
-                text=marker_label,
-                showarrow=False,
-                xanchor="left",
-                yanchor="top",
-                xshift=4,
-                font={"color": _DIM, "size": 11},
+    _add_marker(fig, marker, marker_label, highlight_color)
+    return fig
+
+
+def _add_marker(fig: go.Figure, x: float | None, label: str | None, color: str) -> None:
+    """Dashed vertical line at ``x`` with a small label inside the plot, right of the line and
+    below the top edge (the toolbar). Added after the theme, which restyles annotations."""
+    if x is None:
+        return
+    fig.add_vline(x=x, line={"color": color, "width": 1.5, "dash": "dash"})
+    if label:
+        fig.add_annotation(
+            x=x,
+            y=0.96,
+            xref="x",
+            yref="paper",
+            text=label,
+            showarrow=False,
+            xanchor="left",
+            yanchor="top",
+            xshift=4,
+            font={"color": _DIM, "size": 11},
+        )
+
+
+def binned_histogram_figure(
+    counts: pd.DataFrame,
+    bin_size: float,
+    x_title: str | None = None,
+    y_title: str | None = None,
+    colors: dict[str, str] | None = None,
+    regions: Iterable[tuple[float, float]] = (),
+    region_color: str = "#ffa94d",
+    x_suffix: str = "",
+    x_range: tuple[float, float] | None = None,
+    marker: float | None = None,
+    marker_label: str | None = None,
+    height: int = 400,
+) -> go.Figure:
+    """Histogram from pre-computed bins: ``counts`` index = left bin edge, one column per
+    series (side by side within each bin when several). Same look as ``histogram_figure``;
+    ``regions`` (x ranges, e.g. beyond a limit) are shaded with a translucent
+    ``region_color`` behind the bars, which keep their series colors; ``marker`` adds a dashed
+    vertical line. Lets long runs send a few bins instead of every value.
+    """
+    series = list(counts.columns)
+    several = len(series) > 1
+    width = bin_size / len(series) * (0.9 if several else 1.0)
+    fig = go.Figure()
+    for i, column in enumerate(series):
+        base = _pick(colors, column) if colors or several else _TEXT
+        offset = bin_size * (i + 0.5) / len(series) if several else bin_size / 2
+        fig.add_trace(
+            go.Bar(
+                x=counts.index + offset,
+                y=counts[column],
+                width=width,
+                name=column,
+                marker={"color": base},
+                customdata=[
+                    f"{b:g}–{b + bin_size:g}{x_suffix}: {v:,.0f}" for b, v in counts[column].items()
+                ],
+                hovertemplate="%{customdata}"
+                + (f" {y_title.lower()}" if y_title else "")
+                + "<extra>%{fullData.name}</extra>",
+                showlegend=several,
             )
+        )
+    if x_title:
+        fig.update_xaxes(title_text=x_title)
+    if x_suffix:
+        fig.update_xaxes(ticksuffix=x_suffix)
+    if x_range:
+        fig.update_xaxes(range=list(x_range))
+    fig = _finish(fig, y_title, height)
+    fig.update_layout(hovermode="closest", bargap=0, barmode="overlay")
+    for x0, x1 in regions:
+        fig.add_vrect(
+            x0=x0, x1=x1, fillcolor=region_color, opacity=0.12, line_width=0, layer="below"
+        )
+    _add_marker(fig, marker, marker_label, region_color)
+    return fig
+
+
+def scatter_figure(
+    x: pd.Series,
+    y: pd.Series,
+    x_title: str | None = None,
+    y_title: str | None = None,
+    color: str | None = None,
+    diagonal: bool = False,
+    unit: str = "",
+    height: int = 400,
+) -> go.Figure:
+    """Points (x, y), e.g. one per day; ``diagonal=True`` adds the y = x reference line.
+    Hover: point label (x index) and both values with ``unit``."""
+    frame = pd.DataFrame({"x": x, "y": y}).dropna()
+    suffix = f" {unit}" if unit else ""
+    labels = [
+        index.strftime("%d %b %Y") if hasattr(index, "strftime") else str(index)
+        for index in frame.index
+    ]
+    fig = go.Figure(
+        go.Scatter(
+            x=frame["x"],
+            y=frame["y"],
+            mode="markers",
+            marker={"color": color or _TEXT, "size": 5, "opacity": 0.6},
+            customdata=labels,
+            hovertemplate=(
+                f"%{{customdata}}<br>{x_title or 'x'}: %{{x:,.1f}}{suffix}"
+                f"<br>{y_title or 'y'}: %{{y:,.1f}}{suffix}<extra></extra>"
+            ),
+            showlegend=False,
+        )
+    )
+    if diagonal and not frame.empty:
+        low = float(min(frame.min().min(), 0.0))
+        high = float(frame.max().max())
+        fig.add_trace(
+            go.Scatter(
+                x=[low, high],
+                y=[low, high],
+                mode="lines",
+                line={"color": _DIM, "width": 1, "dash": "dash"},
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+    if x_title:
+        fig.update_xaxes(title_text=f"{x_title}{f' ({unit})' if unit else ''}")
+    fig = _finish(fig, f"{y_title}{f' ({unit})' if unit else ''}" if y_title else None, height)
+    fig.update_layout(hovermode="closest")
     return fig
 
 
@@ -435,8 +628,11 @@ def rows_figure(
     """Stack single-row figures (from the builders above) as rows sharing the x axis.
 
     Takes each figure's traces and y axis title. ``shared_y=True`` gives every row the same y
-    range; a list of row numbers (from 1) matches only those rows to each other.
+    range; a list of row numbers (from 1) matches only those rows to each other. With no rows,
+    an empty figure saying so (e.g. a run whose assets never produce).
     """
+    if not rows:
+        return message_figure("Nothing to show: every series is zero", height)
     fig = make_subplots(
         rows=len(rows),
         cols=1,
@@ -460,22 +656,69 @@ def rows_figure(
     return apply_theme(fig, height=height)
 
 
+def message_figure(text: str, height: int) -> go.Figure:
+    """Empty themed figure with ``text`` centred and no axes (a chart with nothing to draw)."""
+    fig = apply_theme(go.Figure(), height)
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
+    fig.add_annotation(
+        text=text, showarrow=False, x=0.5, y=0.5, xref="paper", yref="paper", font_color=_DIM
+    )
+    return fig
+
+
 def apply_theme(fig: go.Figure, height: int) -> go.Figure:
-    """Dashboard dark theme (layout, hover, legend below the plot, axes, subplot titles)."""
-    plot_height = max(height - _LAYOUT["margin"]["t"] - _LAYOUT["margin"]["b"], 100)
+    """Dashboard dark theme (layout, hover, legend below the plot, axes, subplot titles) with
+    the given height (see ``fit_height``)."""
+    fig.update_layout(**_LAYOUT)
+    fit_height(fig, height)
+    _style_axes(fig)
+    return fig
+
+
+def fit_height(fig: go.Figure, height: int) -> go.Figure:
+    """Set the figure height and size the bottom margin for what sits below the plot (tick
+    labels, an x axis title, the legend), so the legend always stays inside the figure.
+
+    The height must equal the graph container's (``chart_card`` calls this when it receives a
+    figure); otherwise the svg overflows or leaves a gap.
+    """
+    has_x_title = any(
+        (axis.get("title") or {}).get("text")
+        for name, axis in fig.layout.to_plotly_json().items()
+        if name.startswith("xaxis")
+    )
+    gap = _LEGEND_GAP_PX + (_X_TITLE_PX if has_x_title else 0)
+    if _shows_legend(fig):
+        bottom = gap + _LEGEND_ROW_PX
+    else:
+        bottom = _LAYOUT["margin"]["b"] + (_X_TITLE_PX if has_x_title else 0)
+    plot_height = max(height - _LAYOUT["margin"]["t"] - bottom, 100)
     legend = {
         "orientation": "h",
         "x": 0,
-        "y": -_LEGEND_GAP_PX / plot_height,
+        "y": -gap / plot_height,
         "yanchor": "top",
         "bgcolor": "rgba(0,0,0,0)",
         "font": {"size": 11},
         "itemsizing": "constant",
         "itemwidth": 30,
     }
-    fig.update_layout(height=height, legend=legend, **_LAYOUT)
-    _style_axes(fig)
+    fig.update_layout(height=height, legend=legend, margin={"b": bottom})
     return fig
+
+
+def _shows_legend(fig: go.Figure) -> bool:
+    """Whether plotly will draw a legend (several legend items, or one forced on)."""
+    if fig.layout.showlegend is False:
+        return False
+    items = [
+        trace
+        for trace in fig.data
+        if getattr(trace, "showlegend", False) is True
+        or (getattr(trace, "showlegend", False) is None and trace.type != "heatmap")
+    ]
+    return len(items) > 1 or any(getattr(t, "showlegend", False) is True for t in fig.data)
 
 
 def series_color(variable: str) -> str:
@@ -523,6 +766,14 @@ def _tick_step(n: int) -> int:
         if math.ceil(n / step) <= MAX_PERIOD_TICKS_THINNED:
             return step
     return math.ceil(n / MAX_PERIOD_TICKS_THINNED)
+
+
+def _nice_step(raw: float) -> float:
+    """Smallest of 1, 2, 2.5, 5 × 10^k not below ``raw`` (1 if ``raw`` is 0)."""
+    if raw <= 0:
+        return 1.0
+    power = 10 ** math.floor(math.log10(raw))
+    return next(m * power for m in (1, 2, 2.5, 5, 10) if m * power >= raw)
 
 
 def _largest_bin(values: pd.Series, bin_size: float | None) -> int:

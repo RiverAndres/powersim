@@ -30,7 +30,7 @@ Approximate, as context:
 |           |-----------------------------------------------------| panel:       |
 | [Visual.] |                                                     | defined by   |
 | [Sandbox] |              content of the active tab              | each tab     |
-|           |                                                     | (see its .md)|
+| [Develop.]|                                                     | (see its .md)|
 +-----------+-----------------------------------------------------+--------------+
 ```
 

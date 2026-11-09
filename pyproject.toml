@@ -38,6 +38,7 @@ dashboard = [
 
 [project.scripts]
 powersim-dashboard = "powersim.dashboard.app:main"
+powersim-post-solve = "powersim.runs.post_solve:main"
 
 [project.urls]
 Repository = "https://github.com/RiverAndres/powersim"
